@@ -56,7 +56,7 @@ func getProducts(logger *logger.Logger, searchTerm string) (jsonResponse []byte,
 		return nil, false
 	}
 	
-	if !found {
+	if !found || !ok {
 		logger.ERROR("No products matched in database, now web scraping...")
 		products, ok = fetch.Products(logger, searchTerm)
 
