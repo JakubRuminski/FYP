@@ -2,10 +2,10 @@ package api
 
 import (
 	"encoding/json"
-	"html"
 	"net/http"
 
 	"github.com/jakubruminski/FYP/go/api/fetch"
+	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/jakubruminski/FYP/go/api/query"
 
 	"github.com/jakubruminski/FYP/go/utils/http/response"
@@ -13,14 +13,14 @@ import (
 )
 
 type Products struct {
-	Results  []byte `json:"results"`
-	Currency []byte `json:"currency"`
+	Results  *[]*product.Product                   `json:"results"`
+	Currency map[string]map[string]interface{}     `json:"currency"`
 }
 
 
 func GetProducts(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
 
-	searchTerm := html.EscapeString( r.FormValue("search_term") )
+	searchTerm := r.FormValue("search_term")
 
     products, ok := getProducts(logger, searchTerm)
 	if !ok {
@@ -49,11 +49,10 @@ func GetProducts(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 }
 
 
-func getProducts(logger *logger.Logger, searchTerm string) (jsonResponse []byte, ok bool) {
+func getProducts(logger *logger.Logger, searchTerm string) (products *[]*product.Product, ok bool) {
 	products, found, ok := query.Products(logger, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from database")
-		return nil, false
 	}
 	
 	if !found || !ok {
@@ -66,18 +65,12 @@ func getProducts(logger *logger.Logger, searchTerm string) (jsonResponse []byte,
 		}
 	}
 
-	jsonResponse, err := json.Marshal(products)
-	if err != nil {
-		logger.ERROR("Failed to marshal products. Reason: %s", err)
-		return nil, false
-	}
-
-	return jsonResponse, true
+	return products, true
 }
 
-
-func getCurrency(logger *logger.Logger) (jsonResponse []byte, ok bool) {
-	var Rates = map[string]map[string]interface{} {
+// TODO: These should be fetched and not hardcoded.
+func getCurrency(logger *logger.Logger) ( Rates map[string]map[string]interface{}, ok bool ) {
+	Rates = map[string]map[string]interface{} {
 		"Canada":     {"rate": 1.44, "symbol": "C$"},
 		"India":      {"rate": 89.42, "symbol": "₹"},
 		"Costa Rica": {"rate": 588.03, "symbol": "₡"},
@@ -87,11 +80,5 @@ func getCurrency(logger *logger.Logger) (jsonResponse []byte, ok bool) {
 		"Poland":     {"rate": 4.46, "symbol": "zł"},
 	}
 
-	jsonResponse, err := json.Marshal(Rates)
-	if err != nil {
-		logger.ERROR("Failed to marshal currency. Reason: %s", err)
-		return nil, false
-	}
-
-	return jsonResponse, true
+	return Rates, true
 }

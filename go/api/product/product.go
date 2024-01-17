@@ -10,11 +10,14 @@ type Product struct {
 	Seller               string  `json:"seller"`
 	ID                   string  `json:"id"`              // product id. Database specific
 	Name                 string  `json:"name"`
+
 	Currency			 string  `json:"currency"`
 	Price                float64 `json:"price"`
 	PricePerUnit         float64 `json:"sub_price"`
 	DiscountPrice        float64 `json:"discount_price"`
 	DiscountPricePerUnit float64 `json:"discount_price_per_unit"`
+	UnitType             string  `json:"unit_type"`
+
 	URL                  string  `json:"url"`
 	ImgURL               string  `json:"img_url"`
 }
@@ -27,19 +30,21 @@ func NewProduct(logger *logger.Logger, seller, id, name, price, pricePerUnit, di
 		return nil, false
 	}
 
-	currency, pricePerUnitFloat, pricePerUnit, ok := p.FloatPerUnit(logger, pricePerUnit)
+	_, pricePerUnitFloat, pricePerUnit, ok := p.FloatPerUnit(logger, pricePerUnit)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert price %s", pricePerUnit)
 		return nil, false
 	}
 
-	currency, discountPriceFloat, ok := p.Float(logger, discountPrice)
+	_, discountPriceFloat, ok := p.Float(logger, discountPrice)
 	if !ok {
-		logger.DEBUG_WARN("Failed to convert price %s", discountPrice)
-		return nil, false
+		logger.DEBUG_WARN("Failed to convert discount price '%s', will use '%f'", discountPrice, discountPriceFloat)
 	}
 
-	discountPricePerUnit := ( (priceFloat / discountPriceFloat) * pricePerUnitFloat )
+	discountPricePerUnit := discountPriceFloat
+	if discountPriceFloat != 0.0 {
+		discountPricePerUnit = ( (discountPriceFloat / priceFloat) * pricePerUnitFloat )
+	} 
 
 	product = initProduct(logger, currency, seller, id, name, priceFloat, pricePerUnitFloat, discountPriceFloat, discountPricePerUnit, url, imgURL)
 

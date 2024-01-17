@@ -13,14 +13,14 @@ import (
 
 func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Product, ok bool) {
 
-	URL := "https://www.tesco.ie"
-	URL += "/groceries/en-IE/search?query="
-	URL += searchValue
-	URL += "&page=1&count=90"
+	URL     := "https://www.tesco.ie"
+	fullURL := URL + "/groceries/en-IE/search?query="
+	fullURL += searchValue
+	fullURL += "&page=1&count=90"
 
 	waitForJavaScript := false
 
-	urlContext := url.NewUrlContext(URL, waitForJavaScript, fetchFunction)
+	urlContext := url.NewUrlContext(URL, fullURL, waitForJavaScript, fetchFunction)
 
 	logger.INFO("Getting Tesco Products for URL -> %s", URL)
 
@@ -51,7 +51,7 @@ func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url
 		who := "Tesco"
 		result, ok := product.NewProduct(logger, who, "ID", productName, price, subPrice, specialPrice, (urlContext.URL + productLink), imageURL)
 		if !ok {
-			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, productLink, imageURL)
+			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, (urlContext.URL + productLink), imageURL)
 			return
 		}
 		*products = append(*products, result)
@@ -60,7 +60,6 @@ func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url
 
 	logger.INFO("Tesco - Found %d/%d relevant products", len(*products), productListItems.Length())
 
-	// Return a pointer to the results slice
 	return products, true
 }
 
