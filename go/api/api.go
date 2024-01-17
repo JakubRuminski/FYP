@@ -21,9 +21,8 @@ type Products struct {
 func GetProducts(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
 
 	searchTerm := html.EscapeString( r.FormValue("search_term") )
-	searchType := html.EscapeString( r.FormValue("search_type") )
 
-    products, ok := getProducts(logger, searchTerm, searchType)
+    products, ok := getProducts(logger, searchTerm)
 	if !ok {
 		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get products" )
 		return nil, false
@@ -50,8 +49,8 @@ func GetProducts(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 }
 
 
-func getProducts(logger *logger.Logger, searchTerm, searchType string) (jsonResponse []byte, ok bool) {
-	products, found, ok := query.Products(logger, searchTerm, searchType)
+func getProducts(logger *logger.Logger, searchTerm string) (jsonResponse []byte, ok bool) {
+	products, found, ok := query.Products(logger, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from database")
 		return nil, false
@@ -59,7 +58,7 @@ func getProducts(logger *logger.Logger, searchTerm, searchType string) (jsonResp
 	
 	if !found {
 		logger.ERROR("No products matched in database, now web scraping...")
-		products, ok = fetch.Products(logger, searchTerm, searchType)
+		products, ok = fetch.Products(logger, searchTerm)
 
 		if !ok {
 			logger.ERROR("Failed to get products from web scraping")

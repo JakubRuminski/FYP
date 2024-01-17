@@ -7,7 +7,7 @@ import (
 )
 
 
-func Products(logger *logger.Logger, searchValue, searchType string) (products *[]*product.Product, ok bool) {
+func Products(logger *logger.Logger, searchValue string) (products *[]*product.Product, ok bool) {
 
 	return nil, false
 }
