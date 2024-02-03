@@ -85,10 +85,30 @@ func Sort(logger *logger.Logger, products *[]*Product) (sortedProducts *[]*Produ
 	// Use sort.SliceStable to sort the slice if you want to preserve the original order among equal elements.
 	// Otherwise, you can use sort.Slice for potentially faster sorting without this guarantee.
 	sort.SliceStable((*products), func(i, j int) bool {
-		if (*products)[i].PricePerUnit == (*products)[j].PricePerUnit {
-			return (*products)[i].DiscountPrice < (*products)[j].DiscountPrice
+		Product_i_PricePerUnit := (*products)[i].PricePerUnit
+		Product_i_DiscountPrice := (*products)[i].DiscountPrice
+		Product_j_PricePerUnit := (*products)[j].PricePerUnit
+		Product_j_DiscountPrice := (*products)[j].DiscountPrice
+
+		bothHaveDiscount := Product_i_DiscountPrice != 0 && Product_j_DiscountPrice != 0
+		firstProductHasDiscount := Product_i_DiscountPrice != 0
+		secondProductHasDiscount := Product_j_DiscountPrice != 0
+
+		if bothHaveDiscount {
+			return Product_i_DiscountPrice < Product_j_DiscountPrice
 		}
-		return (*products)[i].PricePerUnit < (*products)[j].PricePerUnit
+		if firstProductHasDiscount {
+			return Product_i_DiscountPrice < Product_j_PricePerUnit
+		}
+		if secondProductHasDiscount {
+			return Product_i_PricePerUnit < Product_j_DiscountPrice
+		}
+
+		if Product_i_PricePerUnit == Product_j_PricePerUnit {
+			return false
+		}
+
+		return Product_i_PricePerUnit < Product_j_PricePerUnit
 	})
 
 	return products, true

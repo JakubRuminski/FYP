@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"html"
 	"net/http"
+	"strings"
 
 	"github.com/jakubruminski/FYP/go/api/fetch"
 	"github.com/jakubruminski/FYP/go/api/product"
@@ -18,9 +20,9 @@ type Products struct {
 }
 
 
-func GetProducts(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
+func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
 
-	searchTerm := r.FormValue("search_term")
+	searchTerm := parseSearchValue(r.FormValue("search_term"))
 
     products, ok := getProducts(logger, searchTerm)
 	if !ok {
@@ -81,4 +83,25 @@ func getCurrency(logger *logger.Logger) ( Rates map[string]map[string]interface{
 	}
 
 	return Rates, true
+}
+
+
+func parseSearchValue(searchValue string) string {
+
+	startQuote := ""
+	endQuote := ""
+	if strings.HasPrefix(searchValue, "\"") && strings.HasSuffix(searchValue, "\"") {
+		searchValue = strings.Trim(searchValue, "\"")
+		startQuote = "\""
+		endQuote = "\""
+	}
+
+	searchValue = html.EscapeString(searchValue)
+	
+	// if there is a space, replace it with "%20"
+	searchValue = strings.Replace(searchValue, " ", "%20", -1)
+
+	searchValue = startQuote + searchValue + endQuote
+
+	return searchValue
 }

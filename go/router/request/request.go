@@ -28,7 +28,7 @@ func HandleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Log
 		return
 	}
 
-	_, ok := api.GetProducts(logger, r, w)
+	_, ok := api.GetResponse(logger, r, w)
 	if !ok {
 		logger.ERROR("Error while getting products")
 		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Problem getting products, try again or please return later.")
