@@ -20,6 +20,12 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 
 	wg.Wait()
 
+	products, ok = product.Sort(logger, products)
+	if !ok {
+		logger.ERROR("Error while sorting products")
+		return nil, false
+	}
+
 	return products, true
 
 }
