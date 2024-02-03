@@ -14,19 +14,19 @@ func TestFloat(t *testing.T) {
 		price     string
 		expected  float64
 	}{
-		{"litres", "€43 per 70cl", 61.42857142857143},
-		{"litres", "€50 per 100cl", 50.0},
-		{"kilograms", "$5/kg", 5.0},
-		{"kilograms", "€2/g", 2000.0},
-		{"litres", "£3/ml", 3000.0},
-		{"litres", "$0.01/cl", 1.0},
+		{"litre", "€43 per 70cl", 61.42857142857143},
+		{"litre", "€50 per 100cl", 50.0},
+		{"kilogram", "$5/kg", 5.0},
+		{"kilogram", "€2/g", 2000.0},
+		{"litre", "£3/ml", 3000.0},
+		{"litre", "$0.01/cl", 1.0},
 		{"each", "$2/item", 2.0},
-		{"kilograms", "5/kg", 5.0},
-		{"kilograms", "2/g", 2000.0},
-		{"litres", "3/ml", 3000.0},
-		{"litres", "0.01/cl", 1.0},
+		{"kilogram", "5/kg", 5.0},
+		{"kilogram", "2/g", 2000.0},
+		{"litre", "3/ml", 3000.0},
+		{"litre", "0.01/cl", 1.0},
 		{"each", "2/item", 2.0},
-		{"litres", "€43 per 70cl", 61.42857142857143}, 
+		{"litre", "€43 per 70cl", 61.42857142857143}, 
 
 		// These should fail
 		{"kilograms", "$5", 0.0},

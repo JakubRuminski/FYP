@@ -10,6 +10,7 @@ import (
 	"github.com/jakubruminski/FYP/go/utils/slice"
 )
 
+
 func Float(logger *logger.Logger, price string) (currency string, priceFloat float64, ok bool) {
 	currency, price, ok = findAndStripCurrency(logger, price)
 	if !ok {
@@ -27,7 +28,6 @@ func Float(logger *logger.Logger, price string) (currency string, priceFloat flo
 }
 
 
-
 func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFloat float64, pricePerUnit string, ok bool) {
 	currency, price, ok = findAndStripCurrency(logger, price)
 	if !ok {
@@ -35,7 +35,7 @@ func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFl
 		return "", 0.0, "", false
 	}
 
-	parsedPrice, perUnitQuantity, perUnit, ok := stripMeasurement(logger, price)
+	parsedPrice, perUnitQuantity, perUnit, measurement, ok := stripMeasurement(logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to strip price '%s'", price)
 		return "", 0.0, "", false
@@ -46,9 +46,10 @@ func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFl
 		logger.DEBUG_WARN("Failed to convert price '%s'", price)
 		return "", 0.0, "", false
 	}
-	return currency, priceFloat, pricePerUnit, true
-}
 
+	
+	return currency, priceFloat, measurement, true
+}
 
 
 func findAndStripCurrency(logger *logger.Logger, price string) (currency, priceStripped string, ok bool) {
@@ -56,6 +57,7 @@ func findAndStripCurrency(logger *logger.Logger, price string) (currency, priceS
 	price   = parse.Strip(price, []string{"€", "£", "$"})
 	return currency, price, true
 }
+
 
 func convertToFloat(logger *logger.Logger, price string) (priceFloat float64, ok bool) {
 	priceFloat, err := strconv.ParseFloat(price, 64)
@@ -68,18 +70,23 @@ func convertToFloat(logger *logger.Logger, price string) (priceFloat float64, ok
 }
 
 
-var unitTypes_DICT = map[string][]string{
-	"kilograms": {"kilograms", "kilogram", "kilo", "kg"},
-	"grams":     {"grams", "gram", "g"},
-
-	"centilitres": {"centilitres", "centilitre", "cl"},
-	"millilitres": {"millilitres", "millilitre", "ml"},
-	"litres":      {"litres", "litre", "l"},
-
-	"each": {"each", "unit", "item", "items", "sht"},
+var unitTypes_DICT = map[string]map[string][]string{
+    "kilogram": {
+        "kilogram": {"kilograms", "kilogram", "kilo", "kg"},
+        "gram":     {"grams", "gram", "g"},
+    },
+    "litre": {
+        "centilitre": {"centilitres", "centilitre", "cl"},
+        "millilitre": {"millilitres", "millilitre", "ml"},
+        "litre":      {"litres", "litre", "l"},
+    },
+    "each": {
+        "each": {"each", "unit", "item", "items", "sht"},
+    },
 }
 
-func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnitQuantity, perUnit string, ok bool) {
+
+func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnitQuantity, perUnit, measurement string, ok bool) {
 	var parsedPriceArray []string  // will look like this later -> ["700", "70", "cl"]
 	if strings.Contains(price, "/") {
 		parsedPriceArray = strings.Split(price, "/")
@@ -89,39 +96,41 @@ func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnit
 
 	if len(parsedPriceArray) != 2 {
 		logger.DEBUG_WARN("Failed to parse price '%s'.", price)
-		return "", "", "", false
+		return "", "", "", "", false
 	}
 
 	regexNumeric := regexp.MustCompile(`[0-9.]+`)
 	regexNominal := regexp.MustCompile(`[^0-9.\s]+`)
 
-	for _, unitType := range unitTypes_DICT {
-		for _, unit := range unitType {
-			parsedPrice = regexNumeric.FindString(parsedPriceArray[0])
-			perUnitQuantity = regexNumeric.FindString(parsedPriceArray[1])
-			perUnit = regexNominal.FindString(parsedPriceArray[1])
+	for measurement, measurementDict := range unitTypes_DICT {
+		for _, unitTypeSlice := range measurementDict {
+			for _, unit := range unitTypeSlice {
+				parsedPrice = regexNumeric.FindString(parsedPriceArray[0])
+				perUnitQuantity = regexNumeric.FindString(parsedPriceArray[1])
+				perUnit = regexNominal.FindString(parsedPriceArray[1])
 
-			if parsedPrice == "" || perUnit == "" {
-				logger.DEBUG("parsed Price '%s' or perUnit '%s' was empty. Skipping...", parsedPrice, perUnit)
-				continue
-			}
-			if !strings.Contains(perUnit, unit) {
-				
-				continue
-			}
-	
-			if perUnitQuantity == "" {
-				perUnitQuantity = "1"
-			}
-			perUnit = unit
+				if parsedPrice == "" || perUnit == "" {
+					logger.DEBUG("parsed Price '%s' or perUnit '%s' was empty. Skipping...", parsedPrice, perUnit)
+					continue
+				}
+				if !strings.Contains(perUnit, unit) {
+					continue
+				}
+		
+				if perUnitQuantity == "" {
+					perUnitQuantity = "1"
+				}
 
-			return parsedPrice, perUnitQuantity, perUnit, true
+				perUnit = unit
+				return parsedPrice, perUnitQuantity, perUnit, measurement, true
+			}
 		}
 	}
 	
 	logger.DEBUG("perUnit '%s' did not contain any recognised Unit Type. Skipping...", perUnit)
-	return "", "", "", false
+	return "", "", "", "", false
 }
+
 
 func convertPrice(logger *logger.Logger, parsedPrice, perUnitQuantity, unitType string) (priceFloat float64, ok bool) {
 	parsedPriceFloat, ok := convertToFloat(logger, parsedPrice)
@@ -136,10 +145,10 @@ func convertPrice(logger *logger.Logger, parsedPrice, perUnitQuantity, unitType 
 		return 0.0, false
 	}
 
-	isKiloOrLitre := slice.ContainsString(unitTypes_DICT["kilograms"], unitType) || slice.ContainsString(unitTypes_DICT["litres"], unitType)
-	isGramOrMillilitre := slice.ContainsString(unitTypes_DICT["grams"], unitType) || slice.ContainsString(unitTypes_DICT["millilitres"], unitType)
-	isCentilitre := slice.ContainsString(unitTypes_DICT["centilitres"], unitType)
-	isEach := slice.ContainsString(unitTypes_DICT["each"], unitType)
+	isKiloOrLitre := slice.ContainsString(unitTypes_DICT["kilogram"]["kilogram"], unitType) || slice.ContainsString(unitTypes_DICT["litre"]["litre"], unitType)
+	isGramOrMillilitre := slice.ContainsString(unitTypes_DICT["kilogram"]["gram"], unitType) || slice.ContainsString(unitTypes_DICT["litre"]["millilitre"], unitType)
+	isCentilitre := slice.ContainsString(unitTypes_DICT["litre"]["centilitre"], unitType)
+	isEach := slice.ContainsString(unitTypes_DICT["each"]["each"], unitType)
 
 	if isKiloOrLitre {
 		return parsedPriceFloat, true
@@ -157,3 +166,4 @@ func convertPrice(logger *logger.Logger, parsedPrice, perUnitQuantity, unitType 
 	logger.DEBUG_WARN("Failed to convert price per unit type '%s'", parsedPrice)
 	return 0.0, false
 }
+
