@@ -3,6 +3,7 @@ package fetch
 import (
 	"sync"
 
+	"github.com/jakubruminski/FYP/go/api/fetch/seller/dunnes"
 	"github.com/jakubruminski/FYP/go/api/fetch/seller/tesco"
 	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/jakubruminski/FYP/go/utils/logger"
@@ -18,7 +19,10 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 	wg.Add(1)
 	go fetch(logger, tesco.Fetch, searchValue, &wg, products)
 
-	wg.Wait()
+	wg.Add(1)
+	go fetch(logger, dunnes.Fetch, searchValue, &wg, products)
+
+	wg.Wait()	
 
 	products, ok = product.Sort(logger, products)
 	if !ok {
@@ -27,7 +31,6 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 	}
 
 	return products, true
-
 }
 
 
