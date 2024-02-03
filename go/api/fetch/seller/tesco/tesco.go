@@ -42,16 +42,16 @@ func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url
 	products = &[]*product.Product{}
 	productListItems.Each(func(i int, s *goquery.Selection) {
 
-		productName, price, subPrice, specialPrice, productLink, imageURL, ok := parseProductFields(logger, s)
+		productName, price, subPrice, specialPrice, specialPriceInWords, productLink, imageURL, ok := parseProductFields(logger, s)
 		if !ok {
 			logger.DEBUG_WARN("Failed to parse product fields")
 			return
 		}
 
 		who := "Tesco"
-		result, ok := product.NewProduct(logger, who, "ID", productName, price, subPrice, specialPrice, (urlContext.URL + productLink), imageURL)
+		result, ok := product.NewProduct(logger, who, "ID", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
 		if !ok {
-			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, (urlContext.URL + productLink), imageURL)
+			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
 			return
 		}
 		*products = append(*products, result)
@@ -65,7 +65,7 @@ func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url
 
 
 
-func parseProductFields(logger *logger.Logger, s *goquery.Selection) (name, price, subPrice, specialPrice, link, imageURL string, ok bool) {
+func parseProductFields(logger *logger.Logger, s *goquery.Selection) (name, price, subPrice, specialPrice, specialPriceInWords, link, imageURL string, ok bool) {
 	linkSelector := s.Find("a")
 	name = s.Find("[data-auto=\"product-tile--title\"]").Text()
 	link, exists := linkSelector.Attr("href")
@@ -76,7 +76,8 @@ func parseProductFields(logger *logger.Logger, s *goquery.Selection) (name, pric
 
 	price = s.Find(".beans-price__text").Text()
 	subPrice = s.Find(".beans-price__subtext").Text()
-	specialPrice = getSpecialPrice(logger, s)
+	specialPrice = s.Find(".offer-text").Text()
+	specialPrice, specialPriceInWords = getSpecialPrice(logger, specialPrice)
 
 	imageURL, exists = s.Find("img").Attr("srcset")
 	if !exists {
@@ -87,22 +88,31 @@ func parseProductFields(logger *logger.Logger, s *goquery.Selection) (name, pric
 	}
 	imageURL = strings.Split(imageURL, " ")[0]
 
-	return name, price, subPrice, specialPrice, link, imageURL, true
+	return name, price, subPrice, specialPrice, specialPriceInWords, link, imageURL, true
 }
 
 
-func getSpecialPrice(logger *logger.Logger, s *goquery.Selection) (specialPrice string) {
-	specialPrice = s.Find(".offer-text").Text()
+func getSpecialPrice(logger *logger.Logger, s string) (specialPrice, specialPriceInWords string) {
 
-	pattern := `(\d+\.\d+) Clubcard Price`
+	// Tries to match the pattern "Any 2 for €10 Clubcard Price"
+	pattern := `Any \d+ for €?(\d+(\.\d+)?) Clubcard Price`
     regex := regexp.MustCompile(pattern)
 
-    matches := regex.FindAllStringSubmatch(specialPrice, -1)
+    match := regex.FindString(s)
 
-    // Extract the matched value from the first match
+    if match != "" {
+        specialPriceInWords = match
+    }
+
+	// Tries to match the pattern "€10 Clubcard Price"
+	pattern = `€?(\d+(\.\d+)?) Clubcard Price`
+	regex = regexp.MustCompile(pattern)
+
+    matches := regex.FindAllStringSubmatch(s, -1)
+
     if len(matches) > 0 && len(matches[0]) > 1 {
         specialPrice = matches[0][1]
     }
 
-	return specialPrice
+	return specialPrice, specialPriceInWords
 }
