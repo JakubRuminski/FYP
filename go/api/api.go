@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 	"strings"
+	// "time"
 
 	"github.com/jakubruminski/FYP/go/api/fetch"
 	"github.com/jakubruminski/FYP/go/api/product"
@@ -21,6 +22,10 @@ type Products struct {
 
 
 func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
+	// for {
+	// 	// sleep for 1 second
+	// 	time.Sleep(1 * time.Second)
+	// }
 
 	searchTerm := parseSearchValue(r.FormValue("search_term"))
 

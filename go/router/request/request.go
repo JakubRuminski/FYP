@@ -24,8 +24,7 @@ func HandleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Log
 	logger.INFO("Request: %s", r.URL.Path)
 	
 	if !token.ValidToken(logger, r) {
-		response.WriteResponse(logger, w, http.StatusUnauthorized, "application/json", "error", "Token not valid, please reload the page")
-		return
+		token.CreateToken(logger, w, "User")
 	}
 
 	_, ok := api.GetResponse(logger, r, w)

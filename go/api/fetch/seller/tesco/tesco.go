@@ -51,7 +51,7 @@ func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url
 		who := "Tesco"
 		result, ok := product.NewProduct(logger, who, "ID", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
 		if !ok {
-			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
+			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, specialPriceInWords %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
 			return
 		}
 		*products = append(*products, result)
