@@ -13,43 +13,42 @@ import (
 	"github.com/jakubruminski/FYP/go/utils/logger"
 )
 
-func ValidToken(logger *logger.Logger, r *http.Request) (ok bool) {
+func ValidToken(logger *logger.Logger, r *http.Request) (token *Token, ok bool) {
 	// Read the token from the Auth-Token cookie
 	cookie, err := r.Cookie("Auth-Token")
 	if err != nil {
 		logger.ERROR("Failed to get cookie. Reason: %s", err)
-		return false
+		return nil, false
 	}
 
 	if cookie.Value == "" {
 		logger.ERROR("Cookie value is empty")
-		return false
+		return nil, false
 	}
 
 	tokenParts := strings.Split(cookie.Value, ".")
 	if len(tokenParts) != 2 {
 		logger.ERROR("Invalid token structure")
-		return false
+		return nil, false
 	}
 
 	jsonToken, err := base64.StdEncoding.DecodeString(tokenParts[0])
 	if err != nil {
 		logger.ERROR("Failed to decode token. Reason: %s", err)
-		return false
+		return nil, false
 	}
 
-	token := &Token{}
 	err = json.Unmarshal(jsonToken, token)
 	if err != nil {
 		logger.ERROR("Failed to unmarshal token. Reason: %s", err)
-		return false
+		return nil, false
 	}
 
 	// Verify the HMAC
 	tokenKey, ok := env.Get(logger, "TOKEN_KEY")
 	if !ok {
 		logger.ERROR("Failed to get token key")
-		return false
+		return nil, false
 	}
 
 	h := hmac.New(sha256.New, []byte(tokenKey))
@@ -58,17 +57,17 @@ func ValidToken(logger *logger.Logger, r *http.Request) (ok bool) {
 
 	if sha != tokenParts[1] {
 		logger.ERROR("Invalid token signature")
-		return false
+		return nil, false
 	}
 
 	// Check the token expiration time
 	if time.Unix(token.ExpiresAt, 0).Before(time.Now()) {
 		logger.ERROR("Token expired")
-		return false
+		return nil, false
 	}
 
 	// Token is valid
-	return true
+	return token, true
 }
 
 func CreateToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok bool) {
@@ -114,7 +113,7 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok 
 		Name:     "Auth-Token",
 		Value:    encoding,
 		HttpOnly: true,
-		Secure:   true, // Set this to true if you are using HTTPS
+		Secure:   true,
 		Expires:  time.Now().Add(24 * time.Hour),
 		Path:     "/",
 	}
@@ -128,4 +127,15 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok 
 type Token struct {
 	User      string `json:"user"`
 	ExpiresAt int64  `json:"expiresAt"`
+}
+
+
+func GetIdentifer(logger *logger.Logger, r *http.Request) (string, bool) {
+    token, valid := ValidToken(logger, r)
+    if !valid {
+        logger.ERROR("Invalid or expired token")
+        return "", false
+    }
+
+    return token.User, true
 }

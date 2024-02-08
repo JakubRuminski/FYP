@@ -20,14 +20,18 @@ func HandleRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger
 	fs.ServeHTTP(w, r)
 }
 
+
 func HandleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger, requestID string) {
 	logger.INFO("Request: %s", r.URL.Path)
 	
-	if !token.ValidToken(logger, r) {
+
+	// TODO: Replace "USER" to a pseudo random generated number which somehow combines the users IP address and the current time.
+	_, ok := token.ValidToken(logger, r)
+	if !ok {
 		token.CreateToken(logger, w, "User")
 	}
 
-	_, ok := api.GetResponse(logger, r, w)
+	_, ok = api.GetResponse(logger, r, w)
 	if !ok {
 		logger.ERROR("Error while getting products")
 		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Problem getting products, try again or please return later.")

@@ -20,6 +20,7 @@ func INIT() (port string, mux *http.ServeMux, ok bool) {
 	mux.HandleFunc("/static/", logger.Middleware(request.HandleRequest))
 
 	mux.HandleFunc("/api/search", logger.Middleware(request.HandleApiRequest))
+	mux.HandleFunc("/api/add_item", logger.Middleware(request.HandleApiRequest))
 
 	port, ok = env.Get(&logger, "PORT")
 	if !ok {

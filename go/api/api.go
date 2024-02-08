@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 	"strings"
+
 	// "time"
 
 	"github.com/jakubruminski/FYP/go/api/fetch"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/jakubruminski/FYP/go/utils/http/response"
 	"github.com/jakubruminski/FYP/go/utils/logger"
+	"github.com/jakubruminski/FYP/go/utils/token"
 )
 
 type Products struct {
@@ -27,6 +29,18 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 	// 	time.Sleep(1 * time.Second)
 	// }
 
+	if r.URL.Path != "/api/search" {
+		return getProductsHandler(logger, w, r)
+
+	} else if r.URL.Path != "/api/add_item" {
+		return addItemHandler(logger, w, r)
+	}
+
+	logger.ERROR("Invalid request %s", r.URL.Path)
+	return nil, false
+}
+
+func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	searchTerm := parseSearchValue(r.FormValue("search_term"))
 
     products, ok := getProducts(logger, searchTerm)
@@ -91,6 +105,8 @@ func getCurrency(logger *logger.Logger) ( Rates map[string]map[string]interface{
 }
 
 
+// This function escapes html characters and replaces spaces with "%20"
+//
 func parseSearchValue(searchValue string) string {
 
 	startQuote := ""
@@ -109,4 +125,30 @@ func parseSearchValue(searchValue string) string {
 	searchValue = startQuote + searchValue + endQuote
 
 	return searchValue
+}
+
+
+
+func addItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
+	logger.INFO("Request: %s", r.URL.Path)
+
+	userID, ok := token.GetIdentifer(logger, r)
+	if !ok {
+		response.WriteResponse( logger, w, http.StatusUnauthorized, "application/json", "error", "Unauthorized" )
+		return nil, false
+	}
+
+	product, ok := product.ParseProduct(logger, r)
+	if !ok {
+		response.WriteResponse( logger, w, http.StatusBadRequest, "application/json", "error", "Failed to parse product" )
+		return nil, false
+	}
+
+	ok = query.AddToBaskets(logger, userID, *product)
+	if !ok {
+		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to add item" )
+		return nil, false
+	}
+
+	return nil, true
 }

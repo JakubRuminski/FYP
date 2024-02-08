@@ -1,6 +1,8 @@
 package product
 
 import (
+	"encoding/json"
+	"net/http"
 	"sort"
 
 	"github.com/jakubruminski/FYP/go/utils/logger"
@@ -55,6 +57,20 @@ func NewProduct(logger *logger.Logger, seller, id, name, price, pricePerUnit, di
 
 	return product, true
 }
+
+
+func ParseProduct(logger *logger.Logger, r *http.Request) (product *Product, ok bool) {
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+
+	if err := decoder.Decode(&product); err != nil {
+		logger.ERROR("Failed to decode product. Reason: %s", err)
+		return nil, false
+	}
+
+	return product, true
+}
+
 
 func initProduct(logger *logger.Logger, currency, seller, id, name string, price, pricePerUnit, discountPrice, discountPricePerUnit float64, DiscountPriceInWords, UnitType, url, imgURL string) (product *Product) {
 	product = new(Product)
