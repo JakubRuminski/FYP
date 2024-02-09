@@ -9,11 +9,14 @@ import (
 )
 
 
-func INIT() (port string, mux *http.ServeMux, ok bool) {
+func INIT(logger *logger.Logger) (port string, mux *http.ServeMux, ok bool) {
 	mux = http.NewServeMux()
 
-	logger := logger.Logger{}
-	environment, ok := env.Get(&logger, "ENVIRONMENT")
+	environment := "ENVIRONMENT"
+	port = "PORT"
+	ok = env.GetKeys(logger, &environment, &port)
+	if !ok { return "", nil, false }
+	
 	logger.SetEnvironment(environment)
 
 	mux.HandleFunc("/", logger.Middleware(request.HandleRequest))
@@ -21,11 +24,6 @@ func INIT() (port string, mux *http.ServeMux, ok bool) {
 
 	mux.HandleFunc("/api/search", logger.Middleware(request.HandleApiRequest))
 	mux.HandleFunc("/api/add_item", logger.Middleware(request.HandleApiRequest))
-
-	port, ok = env.Get(&logger, "PORT")
-	if !ok {
-		return "", nil, false
-	}
 
 	return port, mux, true
 }

@@ -10,5 +10,6 @@ require (
 
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/lib/pq v1.10.9
 	golang.org/x/net v0.7.0 // indirect
 )
