@@ -5,10 +5,13 @@ import (
 	"github.com/jakubruminski/FYP/go/utils/logger"
 )
 
-func AddProducts(logger *logger.Logger, products *[]*product.Product) (ok bool) {
-	
-	return false
+func INITIALISE_DATABASE(logger *logger.Logger) (ok bool) {
 
+	return true
+}
+
+func AddProducts(logger *logger.Logger, products *[]*product.Product) (ok bool) {
+	return false
 }
 
 
@@ -20,14 +23,14 @@ func Products(logger *logger.Logger, searchTerm string) (products *[]*product.Pr
 }
 
 
-func AddToBaskets(logger *logger.Logger, userID string, product product.Product) (ok bool) {
+func AddToBaskets(logger *logger.Logger, userID int, product product.Product) (ok bool) {
 
 	return false
 
 }
 
 
-func Baskets(logger *logger.Logger, userID string) (products *[]*product.Product, ok bool) {
+func Baskets(logger *logger.Logger, userID int) (products *[]*product.Product, ok bool) {
 
 	return nil, false
 

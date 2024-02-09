@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -70,9 +71,13 @@ func ValidToken(logger *logger.Logger, r *http.Request) (token *Token, ok bool) 
 	return token, true
 }
 
-func CreateToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok bool) {
+func CreateToken(logger *logger.Logger, w http.ResponseWriter) (ok bool) {
 
-	ok = createToken(logger, w, user)
+    src := rand.NewSource(time.Now().UnixNano())
+	rnd := rand.New(src)
+	pseudorandomID := rnd.Int()
+
+	ok = createToken(logger, w, pseudorandomID)
 	if !ok {
 		logger.ERROR("Failed to create token")
 		return false
@@ -81,11 +86,16 @@ func CreateToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok 
 	return true
 }
 
-func createToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok bool) {
+func createToken(logger *logger.Logger, w http.ResponseWriter, pseudorandomID int) (ok bool) {
+
+	TOKEN_EXPIRY, ok := env.GetInt(logger, "TOKEN_EXPIRY")
+	if !ok {
+		return false
+	}
 
 	token := &Token{
-		User:      user,
-		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		PseudorandomID:  pseudorandomID,
+		ExpiresAt:       time.Now().Add( time.Duration(TOKEN_EXPIRY) * time.Hour ).Unix(),
 	}
 
 	jsonToken, err := json.Marshal(token)
@@ -125,17 +135,17 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, user string) (ok 
 }
 
 type Token struct {
-	User      string `json:"user"`
-	ExpiresAt int64  `json:"expiresAt"`
+	PseudorandomID      int      `json:"pseudorandom_id"`
+	ExpiresAt           int64    `json:"expires_at"`
 }
 
 
-func GetIdentifer(logger *logger.Logger, r *http.Request) (string, bool) {
+func GetID(logger *logger.Logger, r *http.Request) (int, bool) {
     token, valid := ValidToken(logger, r)
     if !valid {
         logger.ERROR("Invalid or expired token")
-        return "", false
+        return 0, false
     }
 
-    return token.User, true
+    return token.PseudorandomID, true
 }

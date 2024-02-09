@@ -1,9 +1,9 @@
 package env
 
-
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 
@@ -25,6 +25,20 @@ func Get(logger *logger.Logger, key string) (value string, ok bool) {
 		logger.ERROR("Environment variable %s not set", key)
 	}
 	return
+}
+
+func GetInt(logger *logger.Logger, key string) (value int, ok bool) {
+	v, ok := Get(logger, key)
+	if !ok {
+		return value, false
+	}
+	value, err := strconv.Atoi(v)
+	if err != nil {
+		logger.ERROR("Failed to convert %s to int. Reason: %s", key, err)
+		return value, false
+	}
+
+	return value, true
 }
 
 func GetKeys(logger *logger.Logger, v ...*string) (ok bool) {

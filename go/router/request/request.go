@@ -13,7 +13,7 @@ const pathToStaticBuild = "./static/build"
 
 
 func HandleRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger, requestID string) {
-	token.CreateToken(logger, w, "User")
+	token.CreateToken(logger, w)
 
 	fs := http.FileServer(http.Dir( pathToStaticBuild ))
 
@@ -28,7 +28,7 @@ func HandleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Log
 	// TODO: Replace "USER" to a pseudo random generated number which somehow combines the users IP address and the current time.
 	_, ok := token.ValidToken(logger, r)
 	if !ok {
-		token.CreateToken(logger, w, "User")
+		token.CreateToken(logger, w)
 	}
 
 	_, ok = api.GetResponse(logger, r, w)

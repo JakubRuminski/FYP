@@ -132,7 +132,7 @@ func parseSearchValue(searchValue string) string {
 func addItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	logger.INFO("Request: %s", r.URL.Path)
 
-	userID, ok := token.GetIdentifer(logger, r)
+	userID, ok := token.GetID(logger, r)
 	if !ok {
 		response.WriteResponse( logger, w, http.StatusUnauthorized, "application/json", "error", "Unauthorized" )
 		return nil, false
