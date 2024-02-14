@@ -18,10 +18,9 @@ import (
 )
 
 type Products struct {
-	Results  *[]*product.Product                   `json:"results"`
-	Currency map[string]map[string]interface{}     `json:"currency"`
+	Results  *[]*product.Product               `json:"results"`
+	Currency map[string]map[string]interface{} `json:"currency"`
 }
-
 
 func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) (jsonResponse []byte, ok bool) {
 	// for {
@@ -29,10 +28,10 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 	// 	time.Sleep(1 * time.Second)
 	// }
 
-	if r.URL.Path != "/api/search" {
+	if r.URL.Path == "/api/search" {
 		return getProductsHandler(logger, w, r)
 
-	} else if r.URL.Path != "/api/add_item" {
+	} else if r.URL.Path == "/api/add_item" {
 		return addItemHandler(logger, w, r)
 	}
 
@@ -43,22 +42,22 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	searchTerm := parseSearchValue(r.FormValue("search_term"))
 
-    products, ok := getProducts(logger, searchTerm)
+	products, ok := getProducts(logger, searchTerm)
 	if !ok {
-		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get products" )
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get products")
 		return nil, false
 	}
 
 	currency, ok := getCurrency(logger)
 	if !ok {
-		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get currency" )
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get currency")
 		return nil, false
 	}
 
-	jsonResponse, err := json.Marshal(Products{ Results:  products, Currency: currency })
+	jsonResponse, err := json.Marshal(Products{Results: products, Currency: currency})
 	if err != nil {
 		logger.ERROR("Failed to marshal products. Reason: %s", err)
-		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to marshal products" )
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to marshal products")
 		return nil, false
 	}
 
@@ -69,13 +68,12 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 	return jsonResponse, true
 }
 
-
 func getProducts(logger *logger.Logger, searchTerm string) (products *[]*product.Product, ok bool) {
 	products, found, ok := query.Products(logger, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from database")
 	}
-	
+
 	if !found || !ok {
 		logger.ERROR("No products matched in database, now web scraping...")
 		products, ok = fetch.Products(logger, searchTerm)
@@ -90,8 +88,8 @@ func getProducts(logger *logger.Logger, searchTerm string) (products *[]*product
 }
 
 // TODO: These should be fetched and not hardcoded.
-func getCurrency(logger *logger.Logger) ( Rates map[string]map[string]interface{}, ok bool ) {
-	Rates = map[string]map[string]interface{} {
+func getCurrency(logger *logger.Logger) (Rates map[string]map[string]interface{}, ok bool) {
+	Rates = map[string]map[string]interface{}{
 		"Canada":     {"rate": 1.44, "symbol": "C$"},
 		"India":      {"rate": 89.42, "symbol": "₹"},
 		"Costa Rica": {"rate": 588.03, "symbol": "₡"},
@@ -104,9 +102,7 @@ func getCurrency(logger *logger.Logger) ( Rates map[string]map[string]interface{
 	return Rates, true
 }
 
-
 // This function escapes html characters and replaces spaces with "%20"
-//
 func parseSearchValue(searchValue string) string {
 
 	startQuote := ""
@@ -118,7 +114,7 @@ func parseSearchValue(searchValue string) string {
 	}
 
 	searchValue = html.EscapeString(searchValue)
-	
+
 	// if there is a space, replace it with "%20"
 	searchValue = strings.Replace(searchValue, " ", "%20", -1)
 
@@ -127,26 +123,24 @@ func parseSearchValue(searchValue string) string {
 	return searchValue
 }
 
-
-
 func addItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	logger.INFO("Request: %s", r.URL.Path)
 
-	userID, ok := token.GetID(logger, r)
+	clientID, ok := token.GetID(logger, r)
 	if !ok {
-		response.WriteResponse( logger, w, http.StatusUnauthorized, "application/json", "error", "Unauthorized" )
+		response.WriteResponse(logger, w, http.StatusUnauthorized, "application/json", "error", "Unauthorized")
 		return nil, false
 	}
 
 	product, ok := product.ParseProduct(logger, r)
 	if !ok {
-		response.WriteResponse( logger, w, http.StatusBadRequest, "application/json", "error", "Failed to parse product" )
+		response.WriteResponse(logger, w, http.StatusBadRequest, "application/json", "error", "Failed to parse product")
 		return nil, false
 	}
 
-	ok = query.AddToBaskets(logger, userID, *product)
+	ok = query.AddToBaskets(logger, clientID, *product)
 	if !ok {
-		response.WriteResponse( logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to add item" )
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to add item")
 		return nil, false
 	}
 
