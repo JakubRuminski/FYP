@@ -39,6 +39,7 @@ func ValidToken(logger *logger.Logger, r *http.Request) (token *Token, ok bool) 
 		return nil, false
 	}
 
+	token = &Token{}
 	err = json.Unmarshal(jsonToken, token)
 	if err != nil {
 		logger.ERROR("Failed to unmarshal token. Reason: %s", err)
@@ -124,7 +125,7 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, pseudorandomID in
 		Value:    encoding,
 		HttpOnly: true,
 		Secure:   true,
-		Expires:  time.Now().Add(24 * time.Hour),
+		Expires:  time.Now().Add(time.Duration(TOKEN_EXPIRY) * time.Hour),
 		Path:     "/",
 	}
 
