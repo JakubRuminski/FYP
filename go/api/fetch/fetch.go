@@ -5,7 +5,9 @@ import (
 
 	"github.com/jakubruminski/FYP/go/api/fetch/seller/dunnes"
 	"github.com/jakubruminski/FYP/go/api/fetch/seller/tesco"
+
 	"github.com/jakubruminski/FYP/go/api/product"
+
 	"github.com/jakubruminski/FYP/go/utils/logger"
 )
 
@@ -22,7 +24,7 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 	wg.Add(1)
 	go fetch(logger, dunnes.Fetch, searchValue, &wg, products)
 
-	wg.Wait()	
+    wg.Wait()
 
 	products, ok = product.Sort(logger, products)
 	if !ok {
@@ -33,12 +35,11 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 	return products, true
 }
 
-
 func fetch( logger *logger.Logger,
-			fetchFunction func(logger *logger.Logger, searchValue string) (*[]*product.Product, bool),
-			searchValue string,
-			wg *sync.WaitGroup,
-			products *[]*product.Product ) {
+	        fetchFunction func(logger *logger.Logger, searchValue string) (*[]*product.Product, bool),
+	        searchValue string,
+	        wg *sync.WaitGroup,
+	        products *[]*product.Product) {
 
 	defer wg.Done()
 

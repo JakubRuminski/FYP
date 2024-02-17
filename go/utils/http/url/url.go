@@ -6,6 +6,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"github.com/jakubruminski/FYP/go/api/fetch/seller"
 	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/jakubruminski/FYP/go/utils/env"
 	"github.com/jakubruminski/FYP/go/utils/logger"
@@ -16,19 +17,22 @@ type UrlContext struct {
 	URL		           string
 	FullURL            string
 	WaitForJavaScript  bool
-	FetchFunc          func( logger *logger.Logger, doc *goquery.Document, urlContext *UrlContext ) (products *[]*product.Product, ok bool)
+	FetchFunc          func( logger *logger.Logger, doc *goquery.Document, urlContext *UrlContext, htmlParser *seller.HTMLParser ) (products *[]*product.Product, ok bool)
+	htmlParser         *seller.HTMLParser
 }
 
 func NewUrlContext( url string,
 	                fullURL string,
 					waitForJavaScript bool,
-					fetchFunc func( logger *logger.Logger, doc *goquery.Document, urlContext *UrlContext ) (products *[]*product.Product, ok bool) ) (newUrlContext *UrlContext) {
+					fetchFunc func( logger *logger.Logger, doc *goquery.Document, urlContext *UrlContext, htmlParser *seller.HTMLParser ) (products *[]*product.Product, ok bool),
+					htmlParser *seller.HTMLParser ) (newUrlContext *UrlContext) {
 	
 	newUrlContext = new(UrlContext)
 	newUrlContext.URL               = url
 	newUrlContext.FullURL           = fullURL
 	newUrlContext.WaitForJavaScript = waitForJavaScript
 	newUrlContext.FetchFunc         = fetchFunc
+	newUrlContext.htmlParser        = htmlParser
 	
 	return newUrlContext
 }
@@ -41,7 +45,7 @@ func (urlContext *UrlContext) Get( logger *logger.Logger ) ( products *[]*produc
 		return nil, false
 	}
 
-	products, ok = urlContext.FetchFunc(logger, doc, urlContext)
+	products, ok = urlContext.FetchFunc(logger, doc, urlContext, urlContext.htmlParser)
 	if !ok {
 		logger.ERROR("Failed to get products from document")
 		return nil, false

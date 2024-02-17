@@ -1,11 +1,11 @@
 package dunnes
 
 import (
-	"regexp"
-	"strings"
-
 	"github.com/PuerkitoBio/goquery"
+
+	"github.com/jakubruminski/FYP/go/api/fetch/seller"
 	"github.com/jakubruminski/FYP/go/api/product"
+	
 	"github.com/jakubruminski/FYP/go/utils/http/url"
 	"github.com/jakubruminski/FYP/go/utils/logger"
 )
@@ -19,7 +19,22 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 
 	waitForJavaScript := false
 
-	urlContext := url.NewUrlContext(URL, fullURL, waitForJavaScript, fetchFunction)
+	htmlParser := seller.NewHTMLParser(
+		"Dunnes",
+		".ColListing--1fk1zey",
+		"[class^='ProductCardTitle--']",
+		"[class^='ProductCardPrice--']",
+		"[class^='ProductCardPriceInfo--']",
+		"[class^='WasPrice--']",
+		`[data-testid="promotionBadgeComponent-testId"]`,
+		`Buy \d+ for €?\d+(\.\d+)?`,
+		"article > a",
+		"href",
+		"img[class*=Image--]",
+		"src",
+	)
+
+	urlContext := url.NewUrlContext(URL, fullURL, waitForJavaScript, fetchFunction, htmlParser)
 
 	logger.INFO("Getting Tesco Products for URL -> %s", URL)
 
@@ -33,80 +48,12 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 
 }
 
-func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url.UrlContext) (products *[]*product.Product, ok bool) {
-	productListItems := doc.Find(".ColListing--1fk1zey")
-
-	products = &[]*product.Product{}
-	productListItems.Each(func(i int, s *goquery.Selection) {
-
-		productName, price, subPrice, specialPrice, specialPriceInWords, productLink, imageURL, ok := parseProductFields(logger, s)
-		if !ok {
-			logger.DEBUG_WARN("Failed to parse product fields")
-			return
-		}
-
-		who := "Dunnes"
-		result, ok := product.NewProduct(logger, who, "ID", productName, price, subPrice, specialPrice, specialPriceInWords, productLink, imageURL)
-		if !ok {
-			logger.DEBUG_WARN("Failed to create product using name %s, price %s, subPrice %s, specialPrice %s, link %s, imageURL %s", productName, price, subPrice, specialPrice, specialPriceInWords, (urlContext.URL + productLink), imageURL)
-			return
-		}
-		*products = append(*products, result)
-
-	})
-
-	logger.INFO("Dunnes - Found %d/%d relevant products", len(*products), productListItems.Length())
+func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url.UrlContext, htmlParser *seller.HTMLParser) (products *[]*product.Product, ok bool) {
+	products, ok = htmlParser.Parse(logger, doc, )
+	if !ok {
+		logger.ERROR("Failed to parse products")
+		return nil, false
+	}
 
 	return products, true
 }
-
-func parseProductFields(logger *logger.Logger, s *goquery.Selection) (name, price, subPrice, specialPrice, specialPriceInWords, link, imageURL string, ok bool) {
-
-	s.Find("[class^='ProductCardTitle--']").Each(func(i int, s *goquery.Selection) {
-		name = strings.Replace(s.Text(), "Age restricted item", "", -1)
-		name = strings.Replace(name, "Open product description", "", -1)
-	})
-
-	link, exists := s.Find("article > a").Attr("href")
-	if !exists {
-		logger.DEBUG_WARN("Failed to find link for product")
-	}
-
-	price = s.Find("[class^='ProductCardPrice--']").Text()
-	subPrice = s.Find("[class^='ProductCardPriceInfo--']").Text()
-	specialPrice = s.Find(".offer-text").Text()
-	specialPrice, specialPriceInWords = getSpecialPrice(logger, specialPrice)
-
-	s.Find("img[class*=Image--]").Each(func(i int, ss *goquery.Selection) {
-		imageURL = ss.AttrOr("src", "")
-	})
-
-	return name, price, subPrice, specialPrice, specialPriceInWords, link, imageURL, true
-}
-
-func getSpecialPrice(logger *logger.Logger, s string) (specialPrice, specialPriceInWords string) {
-
-	// Tries to match the pattern "Buy 2 for €10"
-	pattern := `Buy \d+ for €?\d+(\.\d+)?`
-    regex := regexp.MustCompile(pattern)
-
-    match := regex.FindString(s)
-
-    if match != "" {
-        specialPriceInWords = match
-    	return "", specialPriceInWords
-    }
-
-	// Tries to match the pattern "€10 Clubcard Price"
-	pattern = `SAVE €?\d+(\.\d+)?`
-    regex = regexp.MustCompile(pattern)
-
-    matches := regex.FindAllStringSubmatch(s, -1)
-
-    if len(matches) > 0 && len(matches[0]) > 1 {
-        specialPriceInWords = matches[0][1]
-    }
-
-	return specialPrice, specialPriceInWords
-}
-

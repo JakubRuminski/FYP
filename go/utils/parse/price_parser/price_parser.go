@@ -1,4 +1,4 @@
-package price
+package price_parser
 
 import (
 	"regexp"
@@ -17,6 +17,8 @@ func Float(logger *logger.Logger, price string) (currency string, priceFloat flo
 		logger.DEBUG_WARN("Failed to find and strip currency from '%s'", price)
 		return "", 0.0, false
 	}
+
+	price = parse.StripNonNumeric(price)
 
 	priceFloat, ok = convertToFloat(logger, price)
 	if !ok {
@@ -38,15 +40,15 @@ func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFl
 	parsedPrice, perUnitQuantity, perUnit, measurement, ok := stripMeasurement(logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to strip price '%s'", price)
-		return "", 0.0, "", false
+		return currency, 0.0, "", false
 	}
-	
+	logger.INFO("parsedPrice: %s, perUnitQuantity: %s, perUnit: %s, measurement: %s", parsedPrice, perUnitQuantity, perUnit, measurement)
 	priceFloat, ok = convertPrice(logger, parsedPrice, perUnitQuantity, perUnit)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert price '%s'", price)
-		return "", 0.0, "", false
+		return currency, 0.0, "", false
 	}
-
+	
 	
 	return currency, priceFloat, measurement, true
 }
@@ -128,7 +130,7 @@ func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnit
 	}
 	
 	logger.DEBUG("perUnit '%s' did not contain any recognised Unit Type. Skipping...", perUnit)
-	return "", "", "", "", false
+	return "", "", "unknown", "unknown", false
 }
 
 
@@ -154,14 +156,15 @@ func convertPrice(logger *logger.Logger, parsedPrice, perUnitQuantity, unitType 
 		return parsedPriceFloat, true
 
 	} else if isGramOrMillilitre {
-		return parsedPriceFloat * (1000 / parsedUnitQuantityFloat), true
+		return (parsedPriceFloat * (1000 / parsedUnitQuantityFloat)), true
 
 	} else if isCentilitre {
-		return parsedPriceFloat * (100 / parsedUnitQuantityFloat), true
+		return (parsedPriceFloat * (100 / parsedUnitQuantityFloat)), true
 
 	} else if isEach {
-		return parsedPriceFloat * parsedUnitQuantityFloat, true
+		return (parsedPriceFloat * parsedUnitQuantityFloat), true
 	}
+
 
 	logger.DEBUG_WARN("Failed to convert price per unit type '%s'", parsedPrice)
 	return 0.0, false

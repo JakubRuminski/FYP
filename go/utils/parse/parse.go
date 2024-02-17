@@ -1,6 +1,9 @@
 package parse
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 
 func Find( stringToSearch string, stringsToLookFor []string ) (string) {
@@ -11,6 +14,17 @@ func Find( stringToSearch string, stringsToLookFor []string ) (string) {
 	}
 
 	return ""
+}
+
+// StripNonNumeric removes all non-numeric characters from a string
+// 
+// Exceptions:
+//   - decimal points
+//
+func StripNonNumeric( stringToStrip string ) (stripped string) {
+	reg := regexp.MustCompile("[^0-9.]")
+
+	return reg.ReplaceAllString(stringToStrip, "")
 }
 
 
