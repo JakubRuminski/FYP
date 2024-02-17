@@ -1,60 +1,74 @@
 package products
 
 import (
+	"strings"
+
 	"github.com/jakubruminski/FYP/go/api/product"
+
 	"github.com/jakubruminski/FYP/go/utils/logger"
+	"github.com/jakubruminski/FYP/go/utils/postgres"
 )
 
+var tableName = "products"
 
-type SearchTerms struct {
-	SearchTerm          string     `json:"search_term"`
+func INIT(logger *logger.Logger) (ok bool) {
+    
+	query := product.ProductQuery()
 
-	ProductID		    int        `json:"product_id"`
-}
-
-
-
-
-type Product struct {
-	FetchCount          int        `json:"fetch_count"`
-
-	product.Product
-}
-
-func getProductsColumnsAndTypes(logger *logger.Logger) (columnsAndTypes map[string]string) {
-
-    columnsAndTypes = map[string]string{
-        "fetch_count":               "INT",
-        "seller":                    "VARCHAR(255)",
-        "id":                        "PRIMARY KEY AUTOINCREMENT",
-        "name":                      "VARCHAR(255)",
-		"currency":                  "VARCHAR(10)",
-		"price":                     "DOUBLE PRECISION",
-        "price_per_unit":            "DOUBLE PRECISION",
-        "discount_price":            "DOUBLE PRECISION",
-        "discount_price_per_unit":   "DOUBLE PRECISION",
-        "discount_price_in_words":   "VARCHAR(255)",
-        "unit_type":                 "VARCHAR(30)",
-		"url":                       "VARCHAR(255)",
-        "img_url":                   "VARCHAR(255)",
-    }
-
-    return columnsAndTypes
-}
-
-
-func INIT_PRODUCTS_TABLES(logger *logger.Logger) (ok bool) {
-
-	columnsAndTypes := getProductsColumnsAndTypes(logger)
-
-	query := "CREATE TABLE IF NOT EXISTS products ("
-	for column, columnType := range columnsAndTypes {
-		query += column + " " + columnType + ", "
+	ok = postgres.ExecuteCreateTableQuery(logger, tableName, query)
+	if !ok {
+		logger.ERROR("Couldn't create the products table")
+		return false
 	}
 
-	// TODO: CONTINUE HERE
+	return true	
+}
 
 
-	return true
-	
+func Add(logger *logger.Logger, products *[]*product.Product) bool {
+    // Check if there are products to insert
+    if len(*products) == 0 {
+        logger.INFO("No products to add")
+        return true
+    }
+
+    // Start building the batch insert query
+    query := `
+    INSERT INTO products 
+    (seller, id, name, currency, price, price_per_unit, discount_price, discount_price_per_unit, discount_price_in_words, unit_type, url, img_url)
+    VALUES `
+
+    // Placeholder slice and values slice
+    var placeholders []string
+    var values []interface{}
+
+    // Loop through products to prepare the placeholders and values
+    for _, product := range *products {
+        placeholders = append(placeholders, "(1$, 2$, 3$, 4$, 5$, 6$, 7$, 8$, 9$, 10$, 11$, 12$)")
+        values = append(values,
+            product.Seller,
+            product.ID,
+            product.Name,
+            product.Currency,
+            product.Price,
+            product.PricePerUnit,
+            product.DiscountPrice,
+            product.DiscountPricePerUnit,
+            product.DiscountPriceInWords,
+            product.UnitType,
+            product.URL,
+            product.ImgURL,
+        )
+    }
+
+    // Join all placeholders for the query and add to the main query string
+    query += strings.Join(placeholders, ",")
+
+    ok := postgres.ExecuteInTransaction(logger, query, values...)
+    if !ok {
+        logger.ERROR("Failed to batch insert products")
+        return false
+    }
+
+    return true
 }

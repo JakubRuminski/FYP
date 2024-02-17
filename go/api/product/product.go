@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/jakubruminski/FYP/go/utils/logger"
-	p "github.com/jakubruminski/FYP/go/utils/parse/price"
 )
 
 type Product struct {
@@ -16,7 +15,7 @@ type Product struct {
 
 	Currency			 string  `json:"currency"`
 	Price                float64 `json:"price"`
-	PricePerUnit         float64 `json:"sub_price"`
+	PricePerUnit         float64 `json:"price_per_unit"`
 	DiscountPrice        float64 `json:"discount_price"`
 	DiscountPricePerUnit float64 `json:"discount_price_per_unit"`
 	DiscountPriceInWords string  `json:"discount_price_in_words"`
@@ -26,34 +25,41 @@ type Product struct {
 	ImgURL               string  `json:"img_url"`
 }
 
-func NewProduct(logger *logger.Logger, seller, id, name, price, pricePerUnit, discountPrice, DiscountPriceInWords, url, imgURL string) (product *Product, ok bool) {
+func ProductQuery() (query string) {
+	return `
+	CREATE TABLE IF NOT EXISTS products (
+		seller                              VARCHAR(255),
+		id                                  SERIAL PRIMARY KEY,
+		name                                VARCHAR(255),
+		currency                            VARCHAR(10),
+		price                               DOUBLE PRECISION,
+		price_per_unit                      DOUBLE PRECISION,
+		discount_price                      DOUBLE PRECISION,
+		discount_price_per_unit             DOUBLE PRECISION,
+		discount_price_in_words             VARCHAR(255),
+		unit_type                           VARCHAR(30),
+		url                                 VARCHAR(255),
+		img_url                             VARCHAR(255)
+	)	
+	`
+}
 
-	currency, priceFloat, ok := p.Float(logger, price)
-	if !ok {
-		logger.DEBUG_WARN("Failed to convert price %s", price)
-		return nil, false
-	}
 
-	_, pricePerUnitFloat, unitType, ok := p.FloatPerUnit(logger, pricePerUnit)
-	if !ok {
-		logger.DEBUG_WARN("Failed to convert price %s", pricePerUnit)
-		return nil, false
-	}
+func NewProduct(logger                     *logger.Logger, 
+	            seller                     string,
+				name                       string,
+				currency                   string,
+				price                      float64,
+				pricePerUnit               float64,
+				discountPrice              float64,
+				discountPricePerUnit       float64,
+				pricePerUnitUnitType       string, 
+				DiscountPriceInWords       string,
+				url                        string,
+				imgURL                     string) (product *Product, ok bool) {
 
-    discountPriceFloat := 0.0
-	if discountPrice != "" {
-		_, discountPriceFloat, ok = p.Float(logger, discountPrice)
-	}
-	if !ok {
-		logger.DEBUG_WARN("Failed to convert discount price '%s', will use '%f'", discountPrice, discountPriceFloat)
-	}
 
-	discountPricePerUnit := discountPriceFloat
-	if discountPriceFloat != 0.0 {
-		discountPricePerUnit = ( (discountPriceFloat / priceFloat) * pricePerUnitFloat )
-	} 
-
-	product = initProduct(logger, currency, seller, id, name, priceFloat, pricePerUnitFloat, discountPriceFloat, discountPricePerUnit, DiscountPriceInWords, unitType, url, imgURL)
+	product = initProduct(logger, currency, seller, name, price, pricePerUnit, discountPrice, discountPricePerUnit, DiscountPriceInWords, pricePerUnitUnitType, url, imgURL)
 
 	return product, true
 }
@@ -72,10 +78,10 @@ func ParseProduct(logger *logger.Logger, r *http.Request) (product *Product, ok 
 }
 
 
-func initProduct(logger *logger.Logger, currency, seller, id, name string, price, pricePerUnit, discountPrice, discountPricePerUnit float64, DiscountPriceInWords, UnitType, url, imgURL string) (product *Product) {
+func initProduct(logger *logger.Logger, currency, seller, name string, price, pricePerUnit, discountPrice, discountPricePerUnit float64, DiscountPriceInWords, UnitType, url, imgURL string) (product *Product) {
 	product = new(Product)
 	product.Seller = seller
-	product.ID = id
+	product.ID = "ID"      // This is a placeholder for the product id. It is replaced by actual next available id in the database.
 	product.Name = name
 	
 	product.Currency = currency

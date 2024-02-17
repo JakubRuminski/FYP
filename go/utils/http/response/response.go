@@ -21,8 +21,12 @@ import (
 func WriteResponse(logger *logger.Logger, w http.ResponseWriter, statusCode int, contentType string, responseToClient_Type, responseToClient string) {
 	logger.DEBUG("Writing response to client: %s", responseToClient)
 	
-	w.WriteHeader(statusCode)
-	w.Header().Set("Content-Type", contentType)
+	if w.Header().Get("Status") == "" {
+		w.WriteHeader(statusCode)
+	}
+	if w.Header().Get("Content-Type") == "" {
+	    w.Header().Set("Content-Type", contentType)
+	}
 
 	if responseToClient_Type != "data" && responseToClient_Type != "message" && responseToClient_Type != "error" {
 		logger.ERROR("Invalid response type: %s", responseToClient_Type)

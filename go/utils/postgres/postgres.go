@@ -13,9 +13,9 @@ import (
 func credentialString(logger *logger.Logger) string {
 	db_host      := "DB_HOST"
 	db_port      := "DB_PORT"
-	db_user      := "DB_USER"
-	db_password  := "DB_PASSWORD"
-	db_name      := "DB_NAME"
+	db_user      := "POSTGRES_USER"
+	db_password  := "POSTGRES_PASSWORD"
+	db_name      := "POSTGRES_DB"
 
 	ok := env.GetKeys(logger, &db_host, &db_port, &db_user, &db_password, &db_name)
 	if !ok {
@@ -39,3 +39,55 @@ func connectToDatabase( logger *logger.Logger ) (db *sql.DB, ok bool) {
 	return db, true
 }
 
+
+func ExecuteCreateTableQuery(logger *logger.Logger, tableName, query string) (ok bool) {
+	db, ok := connectToDatabase(logger)
+	if !ok {
+		logger.ERROR("Couldn't connect to the database")
+		return false
+	}
+	defer db.Close()
+
+	_, err := db.Exec(query)
+	if err != nil {
+		logger.ERROR("Couldn't execute the query. Reason: %s", err)
+		return false
+	}
+
+	logger.DEBUG("Successfully created table '%s'", tableName)
+	return true
+}
+
+
+func ExecuteInTransaction(logger *logger.Logger, query string, values ...interface{}) (ok bool) {
+	db, ok := connectToDatabase(logger)
+	if !ok {
+		logger.ERROR("Couldn't connect to the database")
+		return false
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		logger.ERROR("Couldn't start the transaction. Reason: %s", err)
+		return false
+	}
+
+	_, err = tx.Exec(query, values...)
+	if err != nil {
+		logger.ERROR("Couldn't execute the query. Reason: %s", err)
+		err = tx.Rollback()
+		if err != nil {
+			logger.ERROR("Couldn't rollback the transaction. Reason: %s", err)
+		}
+		return false
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		logger.ERROR("Couldn't commit the transaction. Reason: %s", err)
+		return false
+	}
+
+	return true
+}

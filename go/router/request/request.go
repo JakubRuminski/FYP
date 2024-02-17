@@ -13,28 +13,46 @@ const pathToStaticBuild = "./static/build"
 
 
 func HandleRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger, requestID string) {
-	token.CreateToken(logger, w)
+	ok := token.CreateToken(logger, w)
+	if !ok {
+		logger.ERROR("Error while creating token")
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Something went wrong, please try again.")
+		return
+	}
 
 	fs := http.FileServer(http.Dir( pathToStaticBuild ))
 
 	fs.ServeHTTP(w, r)
+	logger.DEBUG("Static files served.")
 }
 
 
 func HandleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger, requestID string) {
-	logger.INFO("Request: %s", r.URL.Path)
-	
+	ok := handleApiRequest(w, r, logger, requestID)
 
-	// TODO: Replace "USER" to a pseudo random generated number which somehow combines the users IP address and the current time.
-	_, ok := token.ValidToken(logger, r)
 	if !ok {
-		token.CreateToken(logger, w)
+		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Something went wrong, please try again.")
+	}
+}
+
+
+func handleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger, requestID string) (ok bool) {
+	logger.INFO("Request: %s", r.URL.Path)
+	_, ok = token.ValidToken(logger, r)
+	if !ok {
+		logger.ERROR("Error while validating token")
+		ok = token.CreateToken(logger, w)
+	}
+	if !ok {
+		logger.ERROR("Error while creating token")
+		return false
 	}
 
 	_, ok = api.GetResponse(logger, r, w)
 	if !ok {
 		logger.ERROR("Error while getting products")
-		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Problem getting products, try again or please return later.")
-		return
+		return false
 	}
+
+	return true
 }
