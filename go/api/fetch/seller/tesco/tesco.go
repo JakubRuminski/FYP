@@ -29,6 +29,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 		"",
 		".offer-text",
 		`€?(\d+(\.\d+)?) Clubcard Price`,
+		[]string{"Clubcard Price"},
 		"a",
 		"href",
 		"img",
@@ -43,6 +44,11 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 	if !ok {
 		logger.ERROR("Failed to get results from Tesco")
 		return nil, false
+	}
+
+	// HACK product links are relative; "https://www.tesco.ie" must be prepended
+	for _, p := range *products {
+		p.URL = URL + p.URL
 	}
 
 	return products, ok

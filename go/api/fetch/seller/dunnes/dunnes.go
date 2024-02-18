@@ -28,6 +28,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 		"[class^='WasPrice--']",
 		`[data-testid="promotionBadgeComponent-testId"]`,
 		`Buy \d+ for €?\d+(\.\d+)?`,
+		[]string{},
 		"article > a",
 		"href",
 		"img[class*=Image--]",
@@ -49,7 +50,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 }
 
 func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url.UrlContext, htmlParser *seller.HTMLParser) (products *[]*product.Product, ok bool) {
-	products, ok = htmlParser.Parse(logger, doc, )
+	products, ok = htmlParser.Parse(logger, doc)
 	if !ok {
 		logger.ERROR("Failed to parse products")
 		return nil, false

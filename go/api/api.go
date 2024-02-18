@@ -44,9 +44,14 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 
 	products, ok := getProducts(logger, searchTerm)
 	if !ok {
-		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get products")
+		logger.ERROR("Failed to get products")
 		return nil, false
 	}
+
+	// ok = query.AddProducts(logger, searchTerm, products)
+	// if !ok {
+	// 	logger.ERROR("Failed to add products to database for search term: %s", searchTerm)
+	// }
 
 	currency, ok := getCurrency(logger)
 	if !ok {

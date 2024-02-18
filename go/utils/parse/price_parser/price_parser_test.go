@@ -34,9 +34,10 @@ func TestFloat(t *testing.T) {
 	}
 
 	success := true
-	for i, tc := range testCases {
+	for index, tc := range testCases {
+		index++
 
-		currency, priceFloat, pricePerUnit, ok := FloatPerUnit(logger, tc.priceAsString)
+		currency, priceFloat, pricePerUnit, ok := FloatPerUnit(index, logger, tc.priceAsString)
 		if tc.expectedPrice == 0.0 && ok {
 			t.Errorf("Expected ok to be false, but got true for test case PriceType: %s, Price: %s", tc.expectedPriceType, tc.priceAsString)
 			success = false
@@ -60,7 +61,7 @@ func TestFloat(t *testing.T) {
 			success = false
 		}
 
-		logger.INFO("%d FINISHED - PriceType: %s, Price: %s, Result: %f, Expected: %f", i, tc.expectedPriceType, tc.priceAsString, priceFloat, tc.expectedPrice)
+		logger.INFO("%d FINISHED - PriceType: %s, Price: %s, Result: %f, Expected: %f", index, tc.expectedPriceType, tc.priceAsString, priceFloat, tc.expectedPrice)
 	}
 
 	if success {

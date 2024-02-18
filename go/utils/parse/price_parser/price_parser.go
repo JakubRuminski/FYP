@@ -11,8 +11,8 @@ import (
 )
 
 
-func Float(logger *logger.Logger, price string) (currency string, priceFloat float64, ok bool) {
-	currency, price, ok = findAndStripCurrency(logger, price)
+func Float(index int, logger *logger.Logger, price string) (currency string, priceFloat float64, ok bool) {
+	currency, price, ok = findAndStripCurrency(index, logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to find and strip currency from '%s'", price)
 		return "", 0.0, false
@@ -20,7 +20,7 @@ func Float(logger *logger.Logger, price string) (currency string, priceFloat flo
 
 	price = parse.StripNonNumeric(price)
 
-	priceFloat, ok = convertToFloat(logger, price)
+	priceFloat, ok = convertToFloat(index, logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert string '%s' to float", price)
 		return "", 0.0, false
@@ -30,20 +30,20 @@ func Float(logger *logger.Logger, price string) (currency string, priceFloat flo
 }
 
 
-func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFloat float64, pricePerUnit string, ok bool) {
-	currency, price, ok = findAndStripCurrency(logger, price)
+func FloatPerUnit(index int, logger *logger.Logger, price string) (currency string, priceFloat float64, pricePerUnit string, ok bool) {
+	currency, price, ok = findAndStripCurrency(index, logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to find and strip currency from '%s'", price)
 		return "", 0.0, "", false
 	}
 
-	parsedPrice, perUnitQuantity, perUnit, measurement, ok := stripMeasurement(logger, price)
+	parsedPrice, perUnitQuantity, perUnit, measurement, ok := stripMeasurement(index, logger, price)
 	if !ok {
 		logger.DEBUG_WARN("Failed to strip price '%s'", price)
 		return currency, 0.0, "", false
 	}
 	logger.INFO("parsedPrice: %s, perUnitQuantity: %s, perUnit: %s, measurement: %s", parsedPrice, perUnitQuantity, perUnit, measurement)
-	priceFloat, ok = convertPrice(logger, parsedPrice, perUnitQuantity, perUnit)
+	priceFloat, ok = convertPrice(index, logger, parsedPrice, perUnitQuantity, perUnit)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert price '%s'", price)
 		return currency, 0.0, "", false
@@ -54,14 +54,14 @@ func FloatPerUnit(logger *logger.Logger, price string) (currency string, priceFl
 }
 
 
-func findAndStripCurrency(logger *logger.Logger, price string) (currency, priceStripped string, ok bool) {
+func findAndStripCurrency(index int, logger *logger.Logger, price string) (currency, priceStripped string, ok bool) {
 	currency = parse.Find(price, []string{"€", "£", "$"})
 	price   = parse.Strip(price, []string{"€", "£", "$"})
 	return currency, price, true
 }
 
 
-func convertToFloat(logger *logger.Logger, price string) (priceFloat float64, ok bool) {
+func convertToFloat(index int, logger *logger.Logger, price string) (priceFloat float64, ok bool) {
 	priceFloat, err := strconv.ParseFloat(price, 64)
 	if err != nil {
 		logger.DEBUG_WARN("Error converting string '%s' to float", price)
@@ -88,7 +88,7 @@ var unitTypes_DICT = map[string]map[string][]string{
 }
 
 
-func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnitQuantity, perUnit, measurement string, ok bool) {
+func stripMeasurement(index int, logger *logger.Logger, price string) (parsedPrice, perUnitQuantity, perUnit, measurement string, ok bool) {
 	var parsedPriceArray []string  // will look like this later -> ["700", "70", "cl"]
 	if strings.Contains(price, "/") {
 		parsedPriceArray = strings.Split(price, "/")
@@ -134,14 +134,14 @@ func stripMeasurement(logger *logger.Logger, price string) (parsedPrice, perUnit
 }
 
 
-func convertPrice(logger *logger.Logger, parsedPrice, perUnitQuantity, unitType string) (priceFloat float64, ok bool) {
-	parsedPriceFloat, ok := convertToFloat(logger, parsedPrice)
+func convertPrice(index int, logger *logger.Logger, parsedPrice, perUnitQuantity, unitType string) (priceFloat float64, ok bool) {
+	parsedPriceFloat, ok := convertToFloat(index, logger, parsedPrice)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert price per unit '%s' to float", parsedPrice)
 		return 0.0, false
 	}
 
-	parsedUnitQuantityFloat, ok := convertToFloat(logger, perUnitQuantity)
+	parsedUnitQuantityFloat, ok := convertToFloat(index, logger, perUnitQuantity)
 	if !ok {
 		logger.DEBUG_WARN("Failed to convert unit quantity '%s' to float", perUnitQuantity)
 		return 0.0, false
