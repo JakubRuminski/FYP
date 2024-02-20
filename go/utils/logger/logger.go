@@ -3,6 +3,8 @@ package logger
 import (
 	"fmt"
 	"net/http"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,43 +37,52 @@ func (l *Logger) SetEnvironment(environment string) {
 	l.Environment = environment
 }
 
-func (l Logger) INFO(message string, args ...interface{}) {
 
-	message = fmt.Sprintf("%s[INFO] %s%s\n", BOLD_GREEN, message, RESET)
-	fmt.Printf(message, args...)
-
+func (l *Logger) INFO(message string, args ...interface{}) {
+    _, file, line, _ := runtime.Caller(1)
+    padding := calculatePadding(file, line)
+    logMessage := fmt.Sprintf("%s[%s:%d] %s [INFO] %s %s\n", BOLD_GREEN, file, line, padding, message, RESET)
+    fmt.Printf(logMessage, args...)
 }
 
-func (l Logger) DEBUG(message string, args ...interface{}) {
+func (l *Logger) DEBUG(message string, args ...interface{}) {
+    if l.Environment != "PRODUCTION" {
+        _, file, line, _ := runtime.Caller(1)
+        padding := calculatePadding(file, line)
+        logMessage := fmt.Sprintf("%s[%s:%d] %s [DEBUG] %s %s\n", LIGHT_BLUE, file, line, padding, message, RESET)
+        fmt.Printf(logMessage, args...)
+    }
+}
 
+func (l *Logger) DEBUG_WARN(message string, args ...interface{}) {
 	if l.Environment != "PRODUCTION" {
-		message = fmt.Sprintf("%s[DEBUG] %s%s\n", LIGHT_BLUE, message, RESET)
-		fmt.Printf(message, args...)
+		_, file, line, _ := runtime.Caller(1)
+		padding := calculatePadding(file, line)
+		logMessage := fmt.Sprintf("%s[%s:%d] %s [DEBUG_WARN] %s %s\n", BOLD_ORANGE, file, line, padding, message, RESET)
+		fmt.Printf(logMessage, args...)
 	}
-
 }
 
-func (l Logger) DEBUG_WARN(message string, args ...interface{}) {
+func (l *Logger) WARN(message string, args ...interface{}) {
+	_, file, line, _ := runtime.Caller(1)
+	padding := calculatePadding(file, line)
+	logMessage := fmt.Sprintf("%s[%s:%d] %s [WARN] %s %s\n", BOLD_ORANGE, file, line, padding, message, RESET)
+	fmt.Printf(logMessage, args...)
+}
 
-	if l.Environment != "PRODUCTION" {
-		message = fmt.Sprintf("%s[DEBUG_WARN] %s%s\n", LIGHT_BLUE, message, RESET)
-		fmt.Printf(message, args...)
+func (l *Logger) ERROR(message string, args ...interface{}) {
+	_, file, line, _ := runtime.Caller(1)
+	padding := calculatePadding(file, line)
+	logMessage := fmt.Sprintf("%s[%s:%d] %s [ERROR] %s %s\n", BOLD_RED, file, line, padding, message, RESET)
+	fmt.Printf(logMessage, args...)
+}
+
+func calculatePadding(file string, line int) string {
+	paddingLength :=  75 - len(fmt.Sprintf("[%s:%d]", file, line))
+	if paddingLength < 0 {
+		paddingLength = 0
 	}
-
-}
-
-func (l Logger) WARN(message string, args ...interface{}) {
-
-	message = fmt.Sprintf("%s[WARN] %s%s\n", BOLD_ORANGE, message, RESET)
-	fmt.Printf(message, args...)
-
-}
-
-func (l Logger) ERROR(message string, args ...interface{}) {
-
-	message = fmt.Sprintf("%s[ERROR] %s%s\n", BOLD_RED, message, RESET)
-	fmt.Printf(message, args...)
-
+	return strings.Repeat("_", paddingLength)
 }
 
 func ( Logger ) STARTTIME( ) time.Time {
