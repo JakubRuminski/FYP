@@ -1,10 +1,13 @@
 package url
 
 import (
+	"context"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/chromedp"
 
 	"github.com/jakubruminski/FYP/go/api/fetch/seller"
 	"github.com/jakubruminski/FYP/go/api/product"
@@ -62,21 +65,44 @@ func getResponse(logger *logger.Logger, search *UrlContext) (doc *goquery.Docume
 	return getResponseDoNotWaitForJavaScript( logger, search )
 }
 
-
+// TODO: Implement Headless Chrome Puppeteer
+//
 func getResponseWaitForJavaScript( logger *logger.Logger, search *UrlContext ) (doc *goquery.Document, ok bool) {
-	// ctx, cancel := chromedp.NewContext( 
-	// 	context.Background(), 
-	// 	chromedp.WithLogf(logger.INFO), 
-	// )
-	// defer cancel()
-	
-	// var nodes []*cdp.Node 
-	// chromedp.Run(ctx, 
-	// 	chromedp.Navigate("https://scrapeme.live/shop"), 
-	// 	chromedp.Nodes(".product", &nodes, chromedp.ByQueryAll), 
-	// ) 
-	
-	return nil, false
+	proxyURL, proxyAPIKey := "PROXY_URL", "PROXY_API_KEY"
+	ok = env.GetKeys(logger, &proxyURL, &proxyAPIKey)
+	if !ok {
+		return nil, false
+	}
+
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	var res string
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(search.FullURL),
+		chromedp.WaitReady("body"),
+		chromedp.OuterHTML("html", &res),
+	)
+	if err != nil {
+		logger.ERROR("Error navigating with Puppeteer: %v", err)
+		return nil, false
+	}
+
+	doc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
+	if err != nil {
+		logger.ERROR("Error loading Puppeteer response body: %v", err)
+		return nil, false
+	}
+
+	rawHTML, err := doc.Html()
+	if err != nil {
+		logger.ERROR("Error getting HTML from Puppeteer response: %v", err)
+		return nil, false
+	}
+
+	logger.DEBUG("Puppeteer response: %v", rawHTML)
+
+	return doc, true
 }
 
 
