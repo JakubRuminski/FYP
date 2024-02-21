@@ -101,7 +101,7 @@ func initProduct(logger *logger.Logger, currency, seller, name string, price, pr
 func Sort(logger *logger.Logger, products *[]*Product) (sortedProducts *[]*Product, ok bool) {
 	if len(*products) == 0 {
 		logger.DEBUG_WARN("No products to sort")
-		return nil, false
+		return nil, true
 	}
 
 	// Use sort.SliceStable to sort the slice if you want to preserve the original order among equal elements.
