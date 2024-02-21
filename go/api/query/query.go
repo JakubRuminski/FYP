@@ -42,13 +42,13 @@ func Products(logger *logger.Logger, searchTerm string) (products *[]*product.Pr
 
 }
 
-func AddToBaskets(logger *logger.Logger, clientID int, product product.Product) (ok bool) {
+func AddToBaskets(logger *logger.Logger, clientID string, product product.Product) (ok bool) {
 
 	return false
 
 }
 
-func Baskets(logger *logger.Logger, clientID int) (products *[]*product.Product, ok bool) {
+func Baskets(logger *logger.Logger, clientID string) (products *[]*product.Product, ok bool) {
 
 	return nil, false
 

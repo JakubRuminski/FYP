@@ -15,7 +15,7 @@ const (
 	BOLD_ORANGE = "\033[1;38;5;208m" // warn
 	BOLD_GREEN  = "\033[1;32m"       // info
 	LIGHT_BLUE  = "\033[36m"         // debug
-	
+
 
 	RESET = "\033[0m"
 )
@@ -24,12 +24,12 @@ type Logger struct {
 	Environment string
 }
 
-type loggingHandlerFunc func(w http.ResponseWriter, r *http.Request, l *Logger, requestID string)
+type loggingHandlerFunc func(w http.ResponseWriter, r *http.Request, l *Logger, clientID string)
 
 func (l *Logger) Middleware(next loggingHandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		requestID := uuid.New().String()
-		next(w, r, l, requestID)
+		clientID := uuid.New().String()
+		next(w, r, l, clientID)
 	}
 }
 
@@ -96,12 +96,12 @@ func ( *Logger ) ENDTIME( startTime time.Time, formatString string, v ...interfa
 		return
 	}
 
-	if elapsed > 10.0 {		
+	if elapsed > 10.0 {
 		formatString = fmt.Sprintf("%s[DEBUGWARNING] %s COMPLETED This took more than 10 seconds. %s%s\n", BOLD_ORANGE, formatString, elapsedTimeString, RESET)
 
 	} else if elapsed > 0.5 {
 		formatString = fmt.Sprintf("%s[DEBUGWARNING] %s COMPLETED This took more than 1/2 a second. %s%s\n", BOLD_ORANGE, formatString, elapsedTimeString, RESET)
 	
-	} 
-	fmt.Printf( formatString, v... )
+	}
+    fmt.Printf( formatString, v... )
 }

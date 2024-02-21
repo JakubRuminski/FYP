@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -72,13 +71,9 @@ func ValidToken(logger *logger.Logger, r *http.Request) (token *Token, ok bool) 
 	return token, true
 }
 
-func CreateToken(logger *logger.Logger, w http.ResponseWriter) (ok bool) {
+func CreateToken(logger *logger.Logger, w http.ResponseWriter, clientID string) (ok bool) {
 
-    src := rand.NewSource(time.Now().UnixNano())
-	rnd := rand.New(src)
-	pseudorandomID := rnd.Int()
-
-	ok = createToken(logger, w, pseudorandomID)
+	ok = createToken(logger, w, clientID)
 	if !ok {
 		logger.ERROR("Failed to create token")
 		return false
@@ -87,7 +82,7 @@ func CreateToken(logger *logger.Logger, w http.ResponseWriter) (ok bool) {
 	return true
 }
 
-func createToken(logger *logger.Logger, w http.ResponseWriter, pseudorandomID int) (ok bool) {
+func createToken(logger *logger.Logger, w http.ResponseWriter, clientID string) (ok bool) {
 
 	TOKEN_EXPIRY, ok := env.GetInt(logger, "TOKEN_EXPIRY")
 	if !ok {
@@ -95,8 +90,8 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, pseudorandomID in
 	}
 
 	token := &Token{
-		PseudorandomID:  pseudorandomID,
-		ExpiresAt:       time.Now().Add( time.Duration(TOKEN_EXPIRY) * time.Hour ).Unix(),
+		clientID: clientID,
+		ExpiresAt:      time.Now().Add(time.Duration(TOKEN_EXPIRY) * time.Hour).Unix(),
 	}
 
 	jsonToken, err := json.Marshal(token)
@@ -136,17 +131,16 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, pseudorandomID in
 }
 
 type Token struct {
-	PseudorandomID      int      `json:"pseudorandom_id"`
-	ExpiresAt           int64    `json:"expires_at"`
+	clientID string   `json:"pseudorandom_id"`
+	ExpiresAt      int64 `json:"expires_at"`
 }
 
+func GetID(logger *logger.Logger, r *http.Request) (string, bool) {
+	token, valid := ValidToken(logger, r)
+	if !valid {
+		logger.ERROR("Invalid or expired token")
+		return "", false
+	}
 
-func GetID(logger *logger.Logger, r *http.Request) (int, bool) {
-    token, valid := ValidToken(logger, r)
-    if !valid {
-        logger.ERROR("Invalid or expired token")
-        return 0, false
-    }
-
-    return token.PseudorandomID, true
+	return token.clientID, true
 }
