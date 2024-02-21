@@ -1,6 +1,6 @@
 module github.com/jakubruminski/FYP
 
-go 1.21.6
+go 1.22.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1

@@ -108,28 +108,28 @@ func Sort(logger *logger.Logger, products *[]*Product) (sortedProducts *[]*Produ
 	// Otherwise, you can use sort.Slice for potentially faster sorting without this guarantee.
 	sort.SliceStable((*products), func(i, j int) bool {
 		Product_i_PricePerUnit := (*products)[i].PricePerUnit
-		Product_i_DiscountPrice := (*products)[i].DiscountPrice
+		Product_i_DiscountPricePerUnit := (*products)[i].DiscountPricePerUnit
 		Product_j_PricePerUnit := (*products)[j].PricePerUnit
-		Product_j_DiscountPrice := (*products)[j].DiscountPrice
+		Product_j_DiscountPricePerUnit := (*products)[j].DiscountPricePerUnit
 
-		bothHaveDiscount := Product_i_DiscountPrice != 0 && Product_j_DiscountPrice != 0
-		firstProductHasDiscount := Product_i_DiscountPrice != 0
-		secondProductHasDiscount := Product_j_DiscountPrice != 0
+		bothHaveDiscount := (Product_i_DiscountPricePerUnit != 0.0 && Product_j_DiscountPricePerUnit != 0.0)
+		firstProductHasDiscount := Product_i_DiscountPricePerUnit != 0.0
+		secondProductHasDiscount := Product_j_DiscountPricePerUnit != 0.0
 
 		if bothHaveDiscount {
-			return Product_i_DiscountPrice < Product_j_DiscountPrice
+			return Product_i_DiscountPricePerUnit < Product_j_DiscountPricePerUnit
 		}
 		if firstProductHasDiscount {
-			return Product_i_DiscountPrice < Product_j_PricePerUnit
+			return Product_i_DiscountPricePerUnit < Product_j_PricePerUnit
 		}
 		if secondProductHasDiscount {
-			return Product_i_PricePerUnit < Product_j_DiscountPrice
+			return Product_i_PricePerUnit < Product_j_DiscountPricePerUnit
 		}
 
 		if Product_i_PricePerUnit == Product_j_PricePerUnit {
 			return false
 		}
-
+		
 		return Product_i_PricePerUnit < Product_j_PricePerUnit
 	})
 
