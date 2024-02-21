@@ -36,6 +36,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 
 		".offer-text",
 		`€?(\d+(\.\d+)?) Clubcard Price`,
+		[]string{`Any \d+ for €?(\d+(\.\d+)?) Clubcard Price`},
 		[]string{"Clubcard Price"},
 		
 		`Any \d+ for €?(\d+(\.\d+)?) Clubcard Price`,

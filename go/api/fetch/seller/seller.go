@@ -24,7 +24,8 @@ type HTMLParser struct {
 	wasPriceStringToStrip                []string
 
 	discountPricePattern                 string
-	discountPriceRegexPattern            string
+	discountPriceAllowedRegexPattern     string
+	discountPriceProhibitedRegexPattern  []string
 	discountPriceStringToStrip           []string
 
 	discountPriceInWordsRegexPattern     string
@@ -46,7 +47,8 @@ func NewHTMLParser( sellerName,
 					wasPricePattern string,
 					wasPriceStringToStrip []string,
 					discountPricePattern string,
-					discountPriceRegexPattern string,
+					discountPriceAllowedRegexPattern string,
+					discountPriceProhibitedRegexPattern []string,
 					discountPriceStringToStrip []string,
 					discountPriceInWordsRegexPattern string,
 					discountPriceInWordsStringsToStrip []string,
@@ -70,7 +72,8 @@ func NewHTMLParser( sellerName,
 		wasPriceStringToStrip:                wasPriceStringToStrip,
 
 		discountPricePattern:                 discountPricePattern,
-		discountPriceRegexPattern:            discountPriceRegexPattern,
+		discountPriceAllowedRegexPattern:     discountPriceAllowedRegexPattern,
+		discountPriceProhibitedRegexPattern:  discountPriceProhibitedRegexPattern,
 		discountPriceStringToStrip:           discountPriceStringToStrip,
 
 		discountPriceInWordsRegexPattern:     discountPriceInWordsRegexPattern,
@@ -122,19 +125,19 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 			link = parser.productLinkPrefix + link
 		}
 
-		currency, price, ok := parseFloat(index, logger, parser.pricePattern, s, false, "", []string{})
+		currency, price, ok := parseFloat(index, logger, parser.pricePattern, s, false, "", []string{}, []string{})
 		if !ok {
 			logger.WARN("%v - [%s] Failed to parse price for product", index, link)
 			return
 		}
 
-		_, wasPrice, ok := parseFloat(index, logger, parser.wasPricePattern, s, true, "", parser.wasPriceStringToStrip)
+		_, wasPrice, ok := parseFloat(index, logger, parser.wasPricePattern, s, true, "", []string{}, parser.wasPriceStringToStrip)
 		if !ok {
 			logger.DEBUG_WARN("%v - [%s] Failed to parse was price. Ignoring...", index, link)
 			
 		}
 
-		_, discountPrice, ok := parseFloat(index, logger, parser.discountPricePattern, s, true, parser.discountPriceRegexPattern, parser.discountPriceStringToStrip)
+		_, discountPrice, ok := parseFloat(index, logger, parser.discountPricePattern, s, true, parser.discountPriceAllowedRegexPattern, parser.discountPriceProhibitedRegexPattern, parser.discountPriceStringToStrip)
 		if !ok {
 			logger.DEBUG_WARN("%v - Failed to parse discount price. Ignoring... [%s] ", index, link)
 		}
@@ -210,7 +213,7 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 	return products, true
 }
 
-func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Selection, optional bool, regexPattern string, stringsToStrip []string) (currency string, price float64, ok bool) {
+func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Selection, optional bool, allowedRegexPattern string, prohibitedRegexPattern, stringsToStrip []string) (currency string, price float64, ok bool) {
 	priceAsString := s.Find(pattern).Text()
 	if priceAsString == "" && optional {
 		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'. The optional flag was set to %v", index, pattern, optional)
@@ -221,11 +224,20 @@ func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Sel
 		return "", 0.0, false
 	}
 
-	if regexPattern != "" {
-		regex := regexp.MustCompile(regexPattern)
+	for _, p := range prohibitedRegexPattern {
+		regex := regexp.MustCompile(p)
+		matches := regex.FindAllStringSubmatch(priceAsString, -1)
+		if len(matches) > 0 {
+			logger.DEBUG_WARN("%v - Found matches with prohibited regex pattern '%s'", index, p)
+			return "", 0.0, false
+		}
+	}
+
+	if allowedRegexPattern != "" {
+		regex := regexp.MustCompile(allowedRegexPattern)
 		matches := regex.FindAllStringSubmatch(priceAsString, -1)
 		if len(matches) == 0 {
-			logger.DEBUG_WARN("%v - Failed to find anything with regex pattern '%s'", index, regexPattern)
+			logger.DEBUG_WARN("%v - Failed to find anything with regex pattern '%s'", index, allowedRegexPattern)
 			return "", 0.0, false
 		}
 
@@ -235,9 +247,13 @@ func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Sel
 		}
 	}
 
+	priceAsString = strings.ToLower(priceAsString)
 	for _, s := range stringsToStrip {
-		priceAsString = strings.Replace(priceAsString, s, "", -1)
-		logger.DEBUG("%v - Stripped %s from %s", index, s, priceAsString)
+		s = strings.ToLower(s)
+		if strings.Contains(priceAsString, s) {
+			priceAsString = strings.Replace(priceAsString, s, "", -1)
+			logger.DEBUG("%v - Stripped %s from %s", index, s, priceAsString)
+		}
 	}
 
 	currency, price, ok = price_parser.Float(index, logger, priceAsString)
@@ -279,9 +295,19 @@ func parseDiscountPriceInWords(index int, logger *logger.Logger, s *goquery.Sele
 		return "", true
 	}
 
+	if len(matches) > 0 && len(matches[0]) > 1 {
+		discountPriceString = matches[0][0]
+		logger.DEBUG("%v - Found matches: %v", index, discountPriceString)
+	}
+
 	for _, s := range stringsToStrip {
-		discountPriceString = strings.Replace(discountPriceString, s, "", -1)
-		logger.DEBUG("%v - Stripped '%s' from '%s'", index, s, discountPriceString)
+		discountPriceString = strings.ToLower(discountPriceString)
+		s = strings.ToLower(s)
+
+		if strings.Contains(discountPriceString, s) {
+			discountPriceString = strings.Replace(discountPriceString, s, "", -1)
+			logger.DEBUG("%v - Stripped '%s' from '%s'", index, s, discountPriceString)
+		}
 	}
 
 	return discountPriceString, true
@@ -295,8 +321,12 @@ func parse(index int, logger *logger.Logger, s *goquery.Selection, pattern strin
 	}
 
 	for _, s := range stringsToStrip {
-		result = strings.Replace(result, s, "", -1)
-		logger.DEBUG("%v - Stripped %s from %s", index, s, result)
+		result = strings.ToLower(result)
+		s = strings.ToLower(s)
+		if strings.Contains(result, s) {
+			result = strings.Replace(result, s, "", -1)
+			logger.DEBUG("%v - Stripped %s from %s", index, s, result)
+		}
 	}
 
 	return result, true

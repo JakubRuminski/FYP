@@ -33,6 +33,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 		
 		`[data-testid="promotionBadgeComponent-testId"]`,
 		"",
+		[]string{`Buy \d+ for €?\d+(\.\d+)?`},
 		[]string{"ONLY", "SAVE"},
 		
 		`Buy \d+ for €?\d+(\.\d+)?`,
