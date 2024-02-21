@@ -3,8 +3,9 @@ package fetch
 import (
 	"sync"
 
-	"github.com/jakubruminski/FYP/go/api/fetch/seller/dunnes"
 	"github.com/jakubruminski/FYP/go/api/fetch/seller/tesco"
+	"github.com/jakubruminski/FYP/go/api/fetch/seller/dunnes"
+	"github.com/jakubruminski/FYP/go/api/fetch/seller/supervalu"
 
 	"github.com/jakubruminski/FYP/go/api/product"
 
@@ -23,6 +24,9 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 
 	wg.Add(1)
 	go fetch(logger, dunnes.Fetch, searchValue, &wg, products)
+
+	wg.Add(1)
+	go fetch(logger, supervalu.Fetch, searchValue, &wg, products)
 
     wg.Wait()
 
