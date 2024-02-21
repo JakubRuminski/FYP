@@ -22,22 +22,31 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 	htmlParser := seller.NewHTMLParser(
 		"Dunnes",
 		".ColListing--1fk1zey",
+		
 		"[class^='ProductCardTitle--']",
+		[]string{"Open product description"},
+		
 		"[class^='ProductCardPrice--']",
 		"[class^='ProductCardPriceInfo--']",
 		"[class^='WasPrice--']",
+		[]string{"was"},
+		
 		`[data-testid="promotionBadgeComponent-testId"]`,
+		"",
+		[]string{"ONLY", "SAVE"},
+		
 		`Buy \d+ for €?\d+(\.\d+)?`,
 		[]string{},
+		
+		"",
 		"article > a",
 		"href",
-		"img[class*=Image--]",
+		
+		"img[class^=ProductCardImage--]",
 		"src",
 	)
 
 	urlContext := url.NewUrlContext(URL, fullURL, waitForJavaScript, fetchFunction, htmlParser)
-
-	logger.INFO("Getting Tesco Products for URL -> %s", URL)
 
 	products, ok = urlContext.Get(logger)
 	if !ok {

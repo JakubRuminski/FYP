@@ -13,17 +13,24 @@ import (
 
 type HTMLParser struct {
 	sellerName                           string
+
 	productListItemsPattern              string
 	productNamePattern                   string
+	productNameStringsToStrip            []string
 
 	pricePattern                         string
 	pricePerUnitPattern                  string
 	wasPricePattern                      string
+	wasPriceStringToStrip                []string
+
 	discountPricePattern                 string
+	discountPriceRegexPattern            string
+	discountPriceStringToStrip           []string
 
 	discountPriceInWordsRegexPattern     string
 	discountPriceInWordsStringsToStrip   []string
 
+	productLinkPrefix					 string
 	productLinkPattern                   string
 	productLinkAttribute                 string
 	imageURLPattern                      string
@@ -32,13 +39,18 @@ type HTMLParser struct {
 
 func NewHTMLParser( sellerName,
 	                productListItemsPattern,
-					productNamePattern,
+					productNamePattern string,
+					productNameStringsToStrip []string,
 					pricePattern,
 					pricePerUnitPattern,
-					wasPricePattern,
-					discountPricePattern,
+					wasPricePattern string,
+					wasPriceStringToStrip []string,
+					discountPricePattern string,
+					discountPriceRegexPattern string,
+					discountPriceStringToStrip []string,
 					discountPriceInWordsRegexPattern string,
 					discountPriceInWordsStringsToStrip []string,
+					productLinkPrefix,
 					productLinkPattern,
 					productLinkAttribute,
 					imageURLPattern,
@@ -47,14 +59,24 @@ func NewHTMLParser( sellerName,
 	return &HTMLParser{
 		sellerName:                           sellerName,
 		productListItemsPattern:              productListItemsPattern,
+		
 		productNamePattern:                   productNamePattern,
+		productNameStringsToStrip:            productNameStringsToStrip,
+		
 		pricePattern:                         pricePattern,
 		pricePerUnitPattern:                  pricePerUnitPattern,
+		
 		wasPricePattern:                      wasPricePattern,
+		wasPriceStringToStrip:                wasPriceStringToStrip,
+
 		discountPricePattern:                 discountPricePattern,
+		discountPriceRegexPattern:            discountPriceRegexPattern,
+		discountPriceStringToStrip:           discountPriceStringToStrip,
+
 		discountPriceInWordsRegexPattern:     discountPriceInWordsRegexPattern,
 		discountPriceInWordsStringsToStrip:   discountPriceInWordsStringsToStrip,
 
+		productLinkPrefix:					  productLinkPrefix,
 		productLinkPattern:                   productLinkPattern,
 		productLinkAttribute:                 productLinkAttribute,
 		
@@ -71,8 +93,20 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 	products = &[]*product.Product{}
 	productListItems.Each(func(i int, s *goquery.Selection) {
 		index++
+		logger.DEBUG("%v - START -----------------", index)
+		defer logger.DEBUG("%v - END -----------------", index)
 
-		productName, ok := parse(index, logger, s, parser.productNamePattern)
+		// print statement which displays the raw html elements and inner html of the product
+		rawHTML, err := s.Html()
+		if err != nil {
+			logger.WARN("%v - Failed to get raw html", index)
+			return
+		}
+		
+		logger.DEBUG("%v - RAW HTML:\n%s", index, rawHTML)
+		
+
+		productName, ok := parse(index, logger, s, parser.productNamePattern, parser.productNameStringsToStrip...)
 		if !ok {
 			logger.WARN("%v - Failed to parse product name", index)
 			return 
@@ -84,21 +118,25 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 			return
 		}
 
-		currency, price, ok := parseFloat(index, logger, parser.pricePattern, s, false)
+		if parser.productLinkPrefix != "" {
+			link = parser.productLinkPrefix + link
+		}
+
+		currency, price, ok := parseFloat(index, logger, parser.pricePattern, s, false, "", []string{})
 		if !ok {
 			logger.WARN("%v - [%s] Failed to parse price for product", index, link)
 			return
 		}
 
-		_, wasPrice, ok := parseFloat(index, logger, parser.wasPricePattern, s, true)
+		_, wasPrice, ok := parseFloat(index, logger, parser.wasPricePattern, s, true, "", parser.wasPriceStringToStrip)
 		if !ok {
 			logger.DEBUG_WARN("%v - [%s] Failed to parse was price. Ignoring...", index, link)
 			
 		}
 
-		_, discountPrice, ok := parseFloat(index, logger, parser.discountPricePattern, s, true)
+		_, discountPrice, ok := parseFloat(index, logger, parser.discountPricePattern, s, true, parser.discountPriceRegexPattern, parser.discountPriceStringToStrip)
 		if !ok {
-			logger.DEBUG_WARN("%v - [%s] Failed to parse discount price. Ignoring...", index, link)
+			logger.DEBUG_WARN("%v - Failed to parse discount price. Ignoring... [%s] ", index, link)
 		}
 
 		if wasPrice != 0.0 {
@@ -114,7 +152,7 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 
 		discountPricePerUnit := (discountPrice / price) * pricePerUnit
 
-		discountPriceInWords, ok := parseDiscountPriceInWords(index, logger, s, parser.discountPricePattern, parser.discountPriceInWordsRegexPattern)
+		discountPriceInWords, ok := parseDiscountPriceInWords(index, logger, s, parser.discountPricePattern, parser.discountPriceInWordsRegexPattern, parser.discountPriceInWordsStringsToStrip...)
 		if !ok {
 			logger.DEBUG_WARN("%v - [%s] Failed to parse discount price in words. Ignoring...", index, link)
 		}
@@ -151,21 +189,55 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 			return
 		}
 
+		logger.DEBUG("%v - Parsed p.Seller: %s", index, p.Seller)
+		logger.DEBUG("%v - Parsed p.Name: %s", index, p.Name)
+		logger.DEBUG("%v - Parsed p.Currency: %s", index, p.Currency)
+		logger.DEBUG("%v - Parsed p.Price: %f", index, p.Price)
+		logger.DEBUG("%v - Parsed p.PricePerUnit: %f", index, p.PricePerUnit)
+		logger.DEBUG("%v - Parsed p.DiscountPrice: %f", index, p.DiscountPrice)
+		logger.DEBUG("%v - Parsed p.DiscountPricePerUnit: %f", index, p.DiscountPricePerUnit)
+		logger.DEBUG("%v - Parsed p.DiscountPriceInWords: %s", index, p.DiscountPriceInWords)
+		logger.DEBUG("%v - Parsed p.URL: %s", index, p.URL)
+		logger.DEBUG("%v - Parsed p.ImgURL: %s", index, p.ImgURL)
+
+		// logger.DATA(`unOrderedProducts = append(unOrderedProducts, &Product{ Seller: "%s", Name: "%s", Currency: "%s", Price: %f, PricePerUnit: %f, DiscountPrice: %f, DiscountPricePerUnit: %f, DiscountPriceInWords: "%s", URL: "%s", ImgURL: "%s" })`, p.Seller, p.Name, p.Currency, p.Price, p.PricePerUnit, p.DiscountPrice, p.DiscountPricePerUnit, p.DiscountPriceInWords, p.URL, p.ImgURL) 
+
 		*products = append(*products, p)
 	})
+
+	logger.INFO("Successfully parsed %v out of %v products", len(*products), index+1)
 
 	return products, true
 }
 
-func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Selection, optional bool) (currency string, price float64, ok bool) {
+func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Selection, optional bool, regexPattern string, stringsToStrip []string) (currency string, price float64, ok bool) {
 	priceAsString := s.Find(pattern).Text()
 	if priceAsString == "" && optional {
-		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'", index, pattern)
+		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'. The optional flag was set to %v", index, pattern, optional)
 		return "", 0.0, true
 
 	} else if priceAsString == "" {
 		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'", index, pattern)
 		return "", 0.0, false
+	}
+
+	if regexPattern != "" {
+		regex := regexp.MustCompile(regexPattern)
+		matches := regex.FindAllStringSubmatch(priceAsString, -1)
+		if len(matches) == 0 {
+			logger.DEBUG_WARN("%v - Failed to find anything with regex pattern '%s'", index, regexPattern)
+			return "", 0.0, false
+		}
+
+		if len(matches) > 0 && len(matches[0]) > 1 {
+			logger.DEBUG("%v - Found matches: %v", index, matches[0])
+			priceAsString = matches[0][1]
+		}
+	}
+
+	for _, s := range stringsToStrip {
+		priceAsString = strings.Replace(priceAsString, s, "", -1)
+		logger.DEBUG("%v - Stripped %s from %s", index, s, priceAsString)
 	}
 
 	currency, price, ok = price_parser.Float(index, logger, priceAsString)
@@ -197,7 +269,7 @@ func parseDiscountPriceInWords(index int, logger *logger.Logger, s *goquery.Sele
 	discountPriceString := s.Find(pattern).Text()
 	if discountPriceString == "" {
 		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'", index, pattern)
-		return "", false
+		return "", true
 	}
 
 	regex := regexp.MustCompile(regexPattern)
@@ -207,23 +279,24 @@ func parseDiscountPriceInWords(index int, logger *logger.Logger, s *goquery.Sele
 		return "", true
 	}
 
-    if len(matches) > 0 && len(matches[0]) > 1 {
-        discountPriceString = matches[0][1]
-    }
-
 	for _, s := range stringsToStrip {
-		logger.INFO("Stripping %s from %s", s, discountPriceString)
 		discountPriceString = strings.Replace(discountPriceString, s, "", -1)
+		logger.DEBUG("%v - Stripped '%s' from '%s'", index, s, discountPriceString)
 	}
 
 	return discountPriceString, true
 }
 
-func parse(index int, logger *logger.Logger, s *goquery.Selection, pattern string) (string, bool) {
+func parse(index int, logger *logger.Logger, s *goquery.Selection, pattern string, stringsToStrip ...string) (string, bool) {
 	result := s.Find(pattern).Text()
 	if result == "" {
 		logger.DEBUG_WARN("%v - Failed to find anything with pattern '%s'", index, pattern)
 		return "", false
+	}
+
+	for _, s := range stringsToStrip {
+		result = strings.Replace(result, s, "", -1)
+		logger.DEBUG("%v - Stripped %s from %s", index, s, result)
 	}
 
 	return result, true

@@ -23,32 +23,38 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 	htmlParser := seller.NewHTMLParser(
 		"Tesco",
 		"ul.product-list > li",
+		
 		"[data-auto=\"product-tile--title\"]",
+		[]string{},
+		
 		".beans-price__text",
+
 		".beans-price__subtext",
+		
 		"",
+		[]string{},
+
 		".offer-text",
 		`€?(\d+(\.\d+)?) Clubcard Price`,
 		[]string{"Clubcard Price"},
+		
+		`Any \d+ for €?(\d+(\.\d+)?) Clubcard Price`,
+		[]string{},
+		
+		URL,
 		"a",
 		"href",
+		
 		"img",
 		"srcset",
 	)
 
 	urlContext := url.NewUrlContext(URL, fullURL, waitForJavaScript, fetchFunction, htmlParser)
 
-	logger.INFO("Getting Tesco Products for URL -> %s", URL)
-
 	products, ok = urlContext.Get(logger)
 	if !ok {
 		logger.ERROR("Failed to get results from Tesco")
 		return nil, false
-	}
-
-	// HACK product links are relative; "https://www.tesco.ie" must be prepended
-	for _, p := range *products {
-		p.URL = URL + p.URL
 	}
 
 	return products, ok
@@ -58,7 +64,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 
 func fetchFunction(logger *logger.Logger, doc *goquery.Document, urlContext *url.UrlContext, htmlParser *seller.HTMLParser) (products *[]*product.Product, ok bool) {
 
-	products, ok = htmlParser.Parse(logger, doc, )
+	products, ok = htmlParser.Parse(logger, doc)
 	if !ok {
 		logger.ERROR("Failed to parse products")
 		return nil, false
