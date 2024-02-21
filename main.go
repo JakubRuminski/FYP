@@ -16,12 +16,12 @@ func main() {
 	logger := &logger.Logger{}
 
 	port, mux, ok := mux.INIT(logger)
-	if !ok { fmt.Println("Failed to initialize router"); return }
+	if !ok { logger.ERROR("Failed to initialize router"); return }
 	
     ok = query.INITIALISE_DATABASE(logger)
-	if !ok { fmt.Println("Failed to initialize database"); return }
-	
-	fmt.Println("Listening on port http://localhost:" + port)
+	if !ok { logger.ERROR("Failed to initialize database"); return }
+
+	logger.INFO("Listening on port http://localhost:" + port)
 
 	http.ListenAndServe(":"+port, mux)
 }
