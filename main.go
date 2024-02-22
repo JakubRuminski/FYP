@@ -15,11 +15,11 @@ func main() {
 	fmt.Println("\033[H\033[2J")
 	logger := &logger.Logger{}
 
+    ok := query.INITIALISE_DATABASE(logger)
+	if !ok { logger.ERROR("Failed to initialize database"); return }
+	
 	port, mux, ok := mux.INIT(logger)
 	if !ok { logger.ERROR("Failed to initialize router"); return }
-	
-    ok = query.INITIALISE_DATABASE(logger)
-	if !ok { logger.ERROR("Failed to initialize database"); return }
 
 	logger.INFO("Listening on port http://localhost:" + port)
 
