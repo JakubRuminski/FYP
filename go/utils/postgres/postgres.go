@@ -54,7 +54,7 @@ func ExecuteCreateTableQuery(logger *logger.Logger, tableName, query string) (ok
 		return false
 	}
 
-	logger.DEBUG("Successfully created table '%s'", tableName)
+	logger.INFO("Successfully created table '%s'", tableName)
 	return true
 }
 
