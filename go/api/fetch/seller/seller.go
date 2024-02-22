@@ -188,7 +188,7 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 		)
 
 		if !ok {
-			logger.DEBUG_WARN("%v Failed to create product using name %s, price %s, pricePerUnit %s, discountPrice %s, link %s, imageURL %s", index, productName, price, pricePerUnit, discountPrice, link, imageURL)
+			logger.DEBUG_WARN("%v Failed to create product using name '%s', price '%s', pricePerUnit '%s', discountPrice '%s', link '%s', imageURL '%s'", index, productName, price, pricePerUnit, discountPrice, link, imageURL)
 			return
 		}
 
@@ -208,7 +208,7 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 		*products = append(*products, p)
 	})
 
-	logger.INFO("Successfully parsed %v out of %v products", len(*products), index+1)
+	logger.INFO("%s - Successfully parsed '%v' out of '%v' products", parser.sellerName, len(*products), index+1)
 
 	return products, true
 }
@@ -242,7 +242,7 @@ func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Sel
 		}
 
 		if len(matches) > 0 && len(matches[0]) > 1 {
-			logger.DEBUG("%v - Found matches: %v", index, matches[0])
+			logger.DEBUG("%v - Found matches: '%v'", index, matches[0])
 			priceAsString = matches[0][1]
 		}
 	}
@@ -252,7 +252,7 @@ func parseFloat(index int, logger *logger.Logger, pattern string, s *goquery.Sel
 		s = strings.ToLower(s)
 		if strings.Contains(priceAsString, s) {
 			priceAsString = strings.Replace(priceAsString, s, "", -1)
-			logger.DEBUG("%v - Stripped %s from %s", index, s, priceAsString)
+			logger.DEBUG("%v - Stripped '%s' from '%s'", index, s, priceAsString)
 		}
 	}
 
@@ -297,7 +297,7 @@ func parseDiscountPriceInWords(index int, logger *logger.Logger, s *goquery.Sele
 
 	if len(matches) > 0 && len(matches[0]) > 1 {
 		discountPriceString = matches[0][0]
-		logger.DEBUG("%v - Found matches: %v", index, discountPriceString)
+		logger.DEBUG("%v - Found matches: '%v'", index, discountPriceString)
 	}
 
 	for _, s := range stringsToStrip {
@@ -325,7 +325,7 @@ func parse(index int, logger *logger.Logger, s *goquery.Selection, pattern strin
 		s = strings.ToLower(s)
 		if strings.Contains(result, s) {
 			result = strings.Replace(result, s, "", -1)
-			logger.DEBUG("%v - Stripped %s from %s", index, s, result)
+			logger.DEBUG("%v - Stripped '%s' from '%s'", index, s, result)
 		}
 	}
 
