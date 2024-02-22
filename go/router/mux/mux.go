@@ -47,11 +47,11 @@ func INIT(logger *logger.Logger) (port string, mux *http.ServeMux, ok bool) {
 	
 	logger.SetEnvironment(environment)
 
-	mux.HandleFunc("/", RequestLimiter( logger, logger.Middleware(request.HandleRequest) ))
-	mux.HandleFunc("/static/", RequestLimiter( logger, logger.Middleware(request.HandleRequest) ))
+	mux.HandleFunc("/", RequestLimiter( logger, request.HandleRequest ))
+	mux.HandleFunc("/static/", RequestLimiter( logger, request.HandleRequest ))
 
-	mux.HandleFunc("/api/search", RequestLimiter( logger, logger.Middleware(request.HandleApiRequest) ))
-	mux.HandleFunc("/api/add_item", RequestLimiter( logger, logger.Middleware(request.HandleApiRequest) ))
+	mux.HandleFunc("/api/search", RequestLimiter( logger, request.HandleApiRequest ))
+	mux.HandleFunc("/api/add_item", RequestLimiter( logger, request.HandleApiRequest ))
 
 	return port, mux, true
 }

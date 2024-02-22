@@ -3,13 +3,10 @@ package logger
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -27,23 +24,13 @@ type Logger struct {
 	ClientID    string
 }
 
-type loggingHandlerFunc func(w http.ResponseWriter, r *http.Request, l *Logger, clientID string)
 
-func (l *Logger) Middleware(next loggingHandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		clientID := uuid.New().String()
-		clientLogger := &Logger{Environment: l.Environment, ClientID: clientID}
-		file := clientLogger.initRequestLogFile(clientID)
-		defer file.Close()
+func (l *Logger) InitRequestLogFile(clientID string) *os.File {
+	filePath := fmt.Sprintf("/logs/%s.txt", clientID)
 
-		next(w, r, clientLogger, clientID)
-	}
-}
-
-func (l *Logger) initRequestLogFile(clientID string) *os.File {
-	file, err := os.Create(fmt.Sprintf("/logs/%s.txt", clientID))
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		l.ERROR("Error creating log file: %s", err)
+		l.ERROR("Error opening or creating log file: %s", err)
 	}
 
 	log.SetOutput(file)

@@ -90,7 +90,7 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, clientID string) 
 	}
 
 	token := &Token{
-		clientID: clientID,
+		ClientID: clientID,
 		ExpiresAt:      time.Now().Add(time.Duration(TOKEN_EXPIRY) * time.Hour).Unix(),
 	}
 
@@ -131,8 +131,8 @@ func createToken(logger *logger.Logger, w http.ResponseWriter, clientID string) 
 }
 
 type Token struct {
-	clientID string   `json:"pseudorandom_id"`
-	ExpiresAt      int64 `json:"expires_at"`
+	ClientID       string  `json:"pseudorandom_id"`
+	ExpiresAt      int64   `json:"expires_at"`
 }
 
 func GetID(logger *logger.Logger, r *http.Request) (string, bool) {
@@ -141,6 +141,10 @@ func GetID(logger *logger.Logger, r *http.Request) (string, bool) {
 		logger.ERROR("Invalid or expired token")
 		return "", false
 	}
+	if token.ClientID == "" {
+		logger.ERROR("Invalid client ID")
+		return "", false
+	}
 
-	return token.clientID, true
+	return token.ClientID, true
 }
