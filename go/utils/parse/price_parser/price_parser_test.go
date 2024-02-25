@@ -61,7 +61,7 @@ func TestFloat(t *testing.T) {
 			success = false
 		}
 
-		logger.INFO("%d FINISHED - PriceType: %s, Price: %s, Result: %f, Expected: %f", index, tc.expectedPriceType, tc.priceAsString, priceFloat, tc.expectedPrice)
+		// logger.INFO("%d FINISHED - PriceType: %s, Price: %s, Result: %f, Expected: %f", index, tc.expectedPriceType, tc.priceAsString, priceFloat, tc.expectedPrice)
 	}
 
 	if success {

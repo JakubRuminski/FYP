@@ -1,4 +1,4 @@
-package clients
+package query_clients
 
 import (
 	"github.com/jakubruminski/FYP/go/utils/logger"

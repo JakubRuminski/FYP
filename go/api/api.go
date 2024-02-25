@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"html"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/jakubruminski/FYP/go/utils/http/response"
 	"github.com/jakubruminski/FYP/go/utils/logger"
+	"github.com/jakubruminski/FYP/go/utils/postgres"
 	"github.com/jakubruminski/FYP/go/utils/token"
 )
 
@@ -41,28 +43,25 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 
 func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	searchTerm := parseSearchValue(r.FormValue("search_term"))
+	searchTerm = strings.ToLower(searchTerm)
 
-	products, ok := getProducts(logger, searchTerm)
-	if !ok {
+	products := &[]*product.Product{}
+
+	ok = postgres.ExecuteInTransaction(logger, getProducts_DoInTransaction, products, searchTerm)
+	if !ok && len(*products) == 0 {
 		logger.ERROR("Failed to get products")
 		return nil, false
 	}
 
-	// ok = query.AddProducts(logger, searchTerm, products)
-	// if !ok {
-	// 	logger.ERROR("Failed to add products to database for search term: %s", searchTerm)
-	// }
-
 	currency, ok := getCurrency(logger)
 	if !ok {
-		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to get currency")
+		logger.ERROR("Failed to get currency")
 		return nil, false
 	}
 
 	jsonResponse, err := json.Marshal(Products{Results: products, Currency: currency})
 	if err != nil {
-		logger.ERROR("Failed to marshal products. Reason: %s", err)
-		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to marshal products")
+		logger.ERROR("Failed to marshal response")
 		return nil, false
 	}
 
@@ -73,24 +72,62 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 	return jsonResponse, true
 }
 
-func getProducts(logger *logger.Logger, searchTerm string) (products *[]*product.Product, ok bool) {
-	products, found, ok := query.Products(logger, searchTerm)
+
+func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interface{}) bool {
+
+    if len(args) != 2 {
+        logger.ERROR("Expected 2 arguments, got %d", len(args))
+        return false
+    }
+
+    products, ok := args[0].(*[]*product.Product)
+    if !ok {
+        logger.ERROR("Failed to get products")
+        return false
+    }
+
+    searchTerm, ok := args[1].(string)
+    if !ok {
+		logger.ERROR("Failed to get search term")
+        return false
+    }
+
+	found, ok := query.Products(logger, tx, products, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from database")
 	}
-
-	if !found || !ok {
-		logger.ERROR("No products matched in database, now web scraping...")
-		products, ok = fetch.Products(logger, searchTerm)
-
-		if !ok {
-			logger.ERROR("Failed to get products from web scraping")
-			return nil, false
-		}
+	if found {
+		logger.INFO("Products found in database")
+		return true
 	}
 
-	return products, true
+	logger.ERROR("No products matched in database, now web scraping...")
+	ok = fetch.Products(logger, products, searchTerm)
+	if !ok {
+		logger.ERROR("Failed to get products from web scraping")
+		return false
+	}
+
+	if len(*products) == 0 {
+		logger.ERROR("No products found")
+		return true
+	}
+
+	ok = query.AddProducts(logger, tx, searchTerm, products)
+	if !ok {
+		logger.ERROR("Failed to add products to database")
+		return false
+	}
+
+	ok = query.AddSearchTerm(logger, tx, searchTerm, products)
+	if !ok {
+		logger.ERROR("Failed to add search term to database")
+		return false
+	}
+
+	return true
 }
+
 
 // TODO: These should be fetched and not hardcoded.
 func getCurrency(logger *logger.Logger) (Rates map[string]map[string]interface{}, ok bool) {

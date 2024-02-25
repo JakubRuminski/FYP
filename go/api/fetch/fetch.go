@@ -13,11 +13,9 @@ import (
 )
 
 
-func Products(logger *logger.Logger, searchValue string) (products *[]*product.Product, ok bool) {
+func Products(logger *logger.Logger, products *[]*product.Product, searchValue string) (ok bool) {
 
 	var wg sync.WaitGroup
-
-    products = &[]*product.Product{}
 
 	wg.Add(1)
 	go fetch(logger, tesco.Fetch, searchValue, &wg, products)
@@ -30,13 +28,13 @@ func Products(logger *logger.Logger, searchValue string) (products *[]*product.P
 
     wg.Wait()
 
-	products, ok = product.Sort(logger, products)
+	ok = product.Sort(logger, products)
 	if !ok {
 		logger.ERROR("Error while sorting products")
-		return nil, false
+		return false
 	}
 
-	return products, true
+	return true
 }
 
 func fetch( logger *logger.Logger,

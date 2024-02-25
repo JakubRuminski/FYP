@@ -9,8 +9,8 @@ import (
 )
 
 type Product struct {
+	ID                   int64   `json:"id"`              // product id. Database specific
 	Seller               string  `json:"seller"`
-	ID                   string  `json:"id"`              // product id. Database specific
 	Name                 string  `json:"name"`
 
 	Currency			 string  `json:"currency"`
@@ -25,11 +25,11 @@ type Product struct {
 	ImgURL               string  `json:"img_url"`
 }
 
-func ProductQuery() (query string) {
+func ProductCreateQuery() (query string) {
 	return `
 	CREATE TABLE IF NOT EXISTS products (
-		seller                              VARCHAR(255),
 		id                                  SERIAL PRIMARY KEY,
+		seller                              VARCHAR(255),
 		name                                VARCHAR(255),
 		currency                            VARCHAR(10),
 		price                               DOUBLE PRECISION,
@@ -42,6 +42,16 @@ func ProductQuery() (query string) {
 		img_url                             VARCHAR(255)
 	)	
 	`
+}
+
+func ProductInsertQuery() (query string) {
+	query = `
+    INSERT INTO products 
+    (seller, name, currency, price, price_per_unit, discount_price, discount_price_per_unit, discount_price_in_words, unit_type, url, img_url)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	RETURNING id
+    `
+	return query
 }
 
 
@@ -80,8 +90,8 @@ func ParseProduct(logger *logger.Logger, r *http.Request) (product *Product, ok 
 
 func initProduct(logger *logger.Logger, currency, seller, name string, price, pricePerUnit, discountPrice, discountPricePerUnit float64, DiscountPriceInWords, UnitType, url, imgURL string) (product *Product) {
 	product = new(Product)
+	product.ID = -1              // This is a placeholder for the product id. It is replaced by actual next available id in the database.
 	product.Seller = seller
-	product.ID = "ID"      // This is a placeholder for the product id. It is replaced by actual next available id in the database.
 	product.Name = name
 	
 	product.Currency = currency
@@ -98,10 +108,10 @@ func initProduct(logger *logger.Logger, currency, seller, name string, price, pr
 }
 
 
-func Sort(logger *logger.Logger, products *[]*Product) (sortedProducts *[]*Product, ok bool) {
+func Sort(logger *logger.Logger, products *[]*Product) (ok bool) {
 	if len(*products) == 0 {
 		logger.DEBUG_WARN("No products to sort")
-		return nil, true
+		return true
 	}
 
 	// Use sort.SliceStable to sort the slice if you want to preserve the original order among equal elements.
@@ -133,5 +143,5 @@ func Sort(logger *logger.Logger, products *[]*Product) (sortedProducts *[]*Produ
 		return Product_i_PricePerUnit < Product_j_PricePerUnit
 	})
 
-	return products, true
+	return true
 }
