@@ -1,13 +1,10 @@
 package url
 
 import (
-	"context"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/chromedp/chromedp"
 
 	"github.com/jakubruminski/FYP/go/api/fetch/seller"
 	"github.com/jakubruminski/FYP/go/api/product"
@@ -59,50 +56,11 @@ func (urlContext *UrlContext) Get( logger *logger.Logger ) ( products *[]*produc
 
 func getResponse(logger *logger.Logger, search *UrlContext) (doc *goquery.Document, ok bool) {
 	if search.WaitForJavaScript {
-        return getResponseWaitForJavaScript( logger, search )
+		logger.ERROR("Waiting for JavaScript is not implemented yet")
+		return nil, false
 	} 
 
 	return getResponseDoNotWaitForJavaScript( logger, search )
-}
-
-// TODO: Implement Headless Chrome Puppeteer
-//
-func getResponseWaitForJavaScript( logger *logger.Logger, search *UrlContext ) (doc *goquery.Document, ok bool) {
-	proxyURL, proxyAPIKey := "PROXY_URL", "PROXY_API_KEY"
-	ok = env.GetKeys(logger, &proxyURL, &proxyAPIKey)
-	if !ok {
-		return nil, false
-	}
-
-	ctx, cancel := chromedp.NewContext(context.Background())
-	defer cancel()
-
-	var res string
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(search.FullURL),
-		chromedp.WaitReady("body"),
-		chromedp.OuterHTML("html", &res),
-	)
-	if err != nil {
-		logger.ERROR("Error navigating with Puppeteer: %v", err)
-		return nil, false
-	}
-
-	doc, err = goquery.NewDocumentFromReader(strings.NewReader(res))
-	if err != nil {
-		logger.ERROR("Error loading Puppeteer response body: %v", err)
-		return nil, false
-	}
-
-	rawHTML, err := doc.Html()
-	if err != nil {
-		logger.ERROR("Error getting HTML from Puppeteer response: %v", err)
-		return nil, false
-	}
-
-	logger.DEBUG("Puppeteer response: %v", rawHTML)
-
-	return doc, true
 }
 
 
