@@ -24,7 +24,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 		".ColListing--1fk1zey",
 		
 		"[class^='ProductCardTitle--']",
-		[]string{"Open product description"},
+		[]string{"Open product description", "age restricted item"},
 		
 		"[class^='ProductCardPrice--']",
 		"[class^='ProductCardPriceInfo--']",
