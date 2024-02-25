@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"runtime"
@@ -26,16 +27,21 @@ type Logger struct {
 
 
 func (l *Logger) InitRequestLogFile(clientID string) *os.File {
-	filePath := fmt.Sprintf("/logs/%s.txt", clientID)
+    filePath := fmt.Sprintf("/logs/%s.txt", clientID)
 
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		l.ERROR("Error opening or creating log file: %s", err)
-	}
+    file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+    if err != nil {
+        l.ERROR("Error opening or creating log file: %s", err)
+        return nil
+    }
 
-	log.SetOutput(file)
+    // Create a multi-writer that writes to both the file and standard output
+    multiWriter := io.MultiWriter(file, os.Stdout)
 
-	return file
+    // Set the output to the multi-writer
+    log.SetOutput(multiWriter)
+
+    return file
 }
 
 
