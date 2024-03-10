@@ -14,7 +14,7 @@ import (
 
 
 var (
-	CONTEXT_TIMEOUT = 10
+	CONTEXT_TIMEOUT = 120
 )
 
 
