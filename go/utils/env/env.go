@@ -41,6 +41,20 @@ func GetInt(logger *logger.Logger, key string) (value int, ok bool) {
 	return value, true
 }
 
+func GetBool(logger *logger.Logger, key string) (value bool, ok bool) {
+	v, ok := Get(logger, key)
+	if !ok {
+		return value, false
+	}
+	value, err := strconv.ParseBool(v)
+	if err != nil {
+		logger.ERROR("Failed to convert %s to bool. Reason: %s", key, err)
+		return value, false
+	}
+
+	return value, true
+}
+
 func GetKeys(logger *logger.Logger, v ...*string) (ok bool) {
 	exists := true
 	for _, key := range v {
