@@ -2,7 +2,6 @@ package logger
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"runtime"
@@ -22,71 +21,86 @@ const (
 
 type Logger struct {
 	Environment string
+	Verbose	    bool
 	ClientID    string
+	File        *os.File
 }
 
 
-func (l *Logger) InitRequestLogFile(clientID string) *os.File {
-    filePath := fmt.Sprintf("/logs/%s.txt", clientID)
+func (l *Logger) InitRequestLogFile(clientID string) (file *os.File, ok bool) {
+	filePath := fmt.Sprintf("/logs/%s.txt", clientID)
 
-    file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-    if err != nil {
-        l.ERROR("Error opening or creating log file: %s", err)
-        return nil
-    }
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		l.ERROR("Error opening or creating log file: %s", err)
+		return file, false
+	}
 
-    // Create a multi-writer that writes to both the file and standard output
-    multiWriter := io.MultiWriter(file, os.Stdout)
-
-    // Set the output to the multi-writer
-    log.SetOutput(multiWriter)
-
-    return file
+	l.File = file
+	return file, true
 }
 
 
-func (l *Logger) SetEnvironment(environment string) {
+func (l *Logger) SetFlags(environment string, verbose bool, clientID string) {
 	l.Environment = environment
+	l.Verbose = verbose
+	l.ClientID = clientID
 }
 
 
 func (l *Logger) INFO(message string, args ...interface{}) {
-    _, file, line, _ := runtime.Caller(1)
-    padding := calculatePadding(file, line)
-    logMessage := fmt.Sprintf("%s[%s:%d] %s [INFO] %s %s\n", BOLD_GREEN, file, line, padding, message, RESET)
-    log.Printf(logMessage, args...)
+    l.writeToTerminal("INFO", BOLD_GREEN, message, args...)
+	l.writeToFile("INFO", message, args...)
 }
 
 func (l *Logger) DEBUG(message string, args ...interface{}) {
-    if l.Environment != "PRODUCTION" {
-        _, file, line, _ := runtime.Caller(1)
-        padding := calculatePadding(file, line)
-        logMessage := fmt.Sprintf("%s[%s:%d] %s [DEBUG] %s %s\n", LIGHT_BLUE, file, line, padding, message, RESET)
-        log.Printf(logMessage, args...)
+    if l.Environment != "PRODUCTION" && l.Verbose {
+        l.writeToTerminal("DEBUG", LIGHT_BLUE, message, args...)
     }
+	l.writeToFile("DEBUG", message, args...)
 }
 
 func (l *Logger) DEBUG_WARN(message string, args ...interface{}) {
-	if l.Environment != "PRODUCTION" {
-		_, file, line, _ := runtime.Caller(1)
-		padding := calculatePadding(file, line)
-		logMessage := fmt.Sprintf("%s[%s:%d] %s [DEBUG_WARN] %s %s\n", BOLD_ORANGE, file, line, padding, message, RESET)
-		log.Printf(logMessage, args...)
+	if l.Environment != "PRODUCTION" && l.Verbose {
+		l.writeToTerminal("DEBUG_WARN", BOLD_ORANGE, message, args...)
 	}
+	l.writeToFile("DEBUG_WARN", message, args...)
 }
 
 func (l *Logger) WARN(message string, args ...interface{}) {
-	_, file, line, _ := runtime.Caller(1)
-	padding := calculatePadding(file, line)
-	logMessage := fmt.Sprintf("%s[%s:%d] %s [WARN] %s %s\n", BOLD_ORANGE, file, line, padding, message, RESET)
-	log.Printf(logMessage, args...)
+	l.writeToTerminal("WARN", BOLD_ORANGE, message, args...)
+	l.writeToFile("WARN", message, args...)
 }
 
 func (l *Logger) ERROR(message string, args ...interface{}) {
-	_, file, line, _ := runtime.Caller(1)
+	l.writeToTerminal("ERROR", BOLD_RED, message, args...)
+	l.writeToFile("ERROR", message, args...)
+}
+
+
+
+
+
+
+func (l *Logger) writeToTerminal(messageType, messageColor, message string, args ...interface{}) {
+	_, file, line, _ := runtime.Caller(2)
 	padding := calculatePadding(file, line)
-	logMessage := fmt.Sprintf("%s[%s:%d] %s [ERROR] %s %s\n", BOLD_RED, file, line, padding, message, RESET)
-	log.Printf(logMessage, args...)
+
+	if ! l.Verbose && l.Environment == "UNIT_TESTING" {
+		return
+	}
+
+	terminalMessage := fmt.Sprintf("%s[%s:%d] %s [%s] %s %s\n", messageColor, file, line, padding, messageType, message, RESET)
+	log.Printf(terminalMessage, args...)
+}
+
+
+func (l *Logger) writeToFile(messageType, message string, args ...interface{}) {
+	_, file, line, _ := runtime.Caller(2)
+	padding := calculatePadding(file, line)
+
+	fileMessage     := fmt.Sprintf("[%s:%d] %s [%s] %s\n", file, line, padding, messageType, message)
+	l.File.WriteString(fmt.Sprintf(fileMessage, args...))
 }
 
 func calculatePadding(file string, line int) string {
@@ -96,6 +110,10 @@ func calculatePadding(file string, line int) string {
 	}
 	return strings.Repeat("_", paddingLength)
 }
+
+
+
+
 
 func ( Logger ) STARTTIME( ) time.Time {
 	return time.Now()
