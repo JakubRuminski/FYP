@@ -3,11 +3,10 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"html"
 	"net/http"
 	"strings"
-
-	// "time"
 
 	"github.com/jakubruminski/FYP/go/api/fetch"
 	"github.com/jakubruminski/FYP/go/api/product"
@@ -35,6 +34,9 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 
 	} else if r.URL.Path == "/api/add_item" {
 		return addItemHandler(logger, w, r)
+
+	} else if r.URL.Path == "/api/get_items" {
+		return getItemsHandler(logger, w, r)
 	}
 
 	logger.ERROR("Invalid request %s", r.URL.Path)
@@ -52,6 +54,10 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 		logger.ERROR("Failed to get products")
 		return nil, false
 	}
+	if len(*products) == 0 {
+		logger.ERROR("No products found")
+		return nil, false
+	}
 
 	currency, ok := getCurrency(logger)
 	if !ok {
@@ -59,15 +65,34 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 		return nil, false
 	}
 
+
+	numberOfProductsForTesco := 0
+	numberOfProductsForDunnes := 0
+	numberOfProductsForSuperValu := 0
+	for _, product := range *products {	
+		if product.Seller == "Tesco" {
+			numberOfProductsForTesco++
+		} else if product.Seller == "Dunnes" {
+			numberOfProductsForDunnes++
+		} else if product.Seller == "SuperValu" {
+			numberOfProductsForSuperValu++
+		}
+	}
+	logger.INFO("Tesco: %d", numberOfProductsForTesco)
+	logger.INFO("Dunnes: %d", numberOfProductsForDunnes)
+	logger.INFO("SuperValu: %d", numberOfProductsForSuperValu)
+
 	jsonResponse, err := json.Marshal(Products{Results: products, Currency: currency})
 	if err != nil {
-		logger.ERROR("Failed to marshal response")
+		logger.ERROR("Failed to marshal response: %s", err)
 		return nil, false
 	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResponse)
+
+	logger.INFO("Client /logs/%s.txt searched for %s and got %d results", logger.ClientID, searchTerm, len(*products))
 
 	return jsonResponse, true
 }
@@ -92,16 +117,32 @@ func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...inte
         return false
     }
 
-	found, ok := query.Products(logger, tx, products, searchTerm)
+	found, expired, ok := query.Products(logger, tx, products, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from database")
 	}
-	if found {
-		logger.INFO("Products found in database")
+	if !expired && found {
+		logger.DEBUG("Products found in database")
 		return true
 	}
 
-	logger.ERROR("No products matched in database, now web scraping...")
+	var oldProducts []*product.Product
+	if expired {
+		oldProducts = make([]*product.Product, len(*products))
+		copy(oldProducts, *products)
+	
+		// Reset *products to an empty slice, without allocating new memory
+		*products = (*products)[:0]
+	
+		logger.DEBUG_WARN("Products expired in database")
+	}
+
+	logger.INFO("products variable address: %p", products)
+	logger.INFO("oldProducts variable address: %p", oldProducts)
+
+	if !found {
+		logger.DEBUG_WARN("No products matched in database, now web scraping...")
+	}
 	ok = fetch.Products(logger, products, searchTerm)
 	if !ok {
 		logger.ERROR("Failed to get products from web scraping")
@@ -113,7 +154,7 @@ func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...inte
 		return true
 	}
 
-	ok = query.AddProducts(logger, tx, searchTerm, products)
+	ok = query.AddProducts(logger, tx, searchTerm, &oldProducts, products)
 	if !ok {
 		logger.ERROR("Failed to add products to database")
 		return false
@@ -147,6 +188,8 @@ func getCurrency(logger *logger.Logger) (Rates map[string]map[string]interface{}
 // This function escapes html characters and replaces spaces with "%20"
 func parseSearchValue(searchValue string) string {
 
+	searchValue = strings.ToLower(searchValue)
+
 	startQuote := ""
 	endQuote := ""
 	if strings.HasPrefix(searchValue, "\"") && strings.HasSuffix(searchValue, "\"") {
@@ -165,26 +208,107 @@ func parseSearchValue(searchValue string) string {
 	return searchValue
 }
 
+
 func addItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	logger.INFO("Request: %s", r.URL.Path)
 
 	clientID, ok := token.GetID(logger, r)
 	if !ok {
-		response.WriteResponse(logger, w, http.StatusUnauthorized, "application/json", "error", "Unauthorized")
+		logger.ERROR("Failed to get client ID")
 		return nil, false
 	}
-
+     
 	product, ok := product.ParseProduct(logger, r)
 	if !ok {
-		response.WriteResponse(logger, w, http.StatusBadRequest, "application/json", "error", "Failed to parse product")
+		logger.ERROR("Failed to parse product")
 		return nil, false
 	}
 
-	ok = query.AddToBaskets(logger, clientID, *product)
+	logger.DEBUG("Adding product to basket id: %d", product.ID)
+
+	ok = postgres.ExecuteInTransaction(logger, AddItem_DoInTransaction, clientID, product)
 	if !ok {
-		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Failed to add item")
+		logger.ERROR("Failed to add product to basket")
 		return nil, false
 	}
+
+	message := fmt.Sprintf("Product added to basket: %s", product.Name)
+	response.WriteResponse(logger, w, http.StatusOK, "application/json", "message", message)
 
 	return nil, true
 }
+
+
+func AddItem_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interface{}) bool {
+	if len(args) != 2 {
+		logger.ERROR("Expected 2 arguments, got %d", len(args))
+		return false
+	}
+
+	clientID, ok := args[0].(string)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return false
+	}
+
+	product, ok := args[1].(*product.Product)
+	if !ok {
+		logger.ERROR("Failed to get product")
+		return false
+	}
+
+	return query.AddToBaskets(logger, tx, clientID, *product)
+}
+
+
+func getItemsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
+	logger.INFO("Request: %s", r.URL.Path)
+
+	clientID, ok := token.GetID(logger, r)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return nil, false
+	}
+
+	products := &[]*product.Product{}
+	ok = postgres.ExecuteInTransaction(logger, getItems_DoInTransaction, clientID, products)
+	if !ok {
+		logger.ERROR("Failed to get products")
+		return nil, false
+	}
+
+	jsonResponse, err := json.Marshal(Products{Results: products})
+	if err != nil {
+		logger.ERROR("Failed to marshal response")
+		return nil, false
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResponse)
+
+	return jsonResponse, true
+}
+
+
+func getItems_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interface{}) bool {
+	if len(args) != 2 {
+		logger.ERROR("Expected 2 arguments, got %d", len(args))
+		return false
+	}
+
+	clientID, ok := args[0].(string)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return false
+	}
+
+	products, ok := args[1].(*[]*product.Product)
+	if !ok {
+		logger.ERROR("Failed to get products")
+		return false
+	}
+
+	return query.Baskets(logger, tx, clientID, products)
+}
+

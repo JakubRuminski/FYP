@@ -99,6 +99,8 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 		logger.DEBUG("%v - START -----------------", index)
 		defer logger.DEBUG("%v - END -----------------", index)
 
+		logger.DEBUG("Seller: %s", parser.sellerName)
+
 		// print statement which displays the raw html elements and inner html of the product
 		rawHTML, err := s.Html()
 		if err != nil {
@@ -149,11 +151,18 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 
 		_, pricePerUnit, pricePerUnitUnitType, ok := parseFloatPerUnit(index, logger, parser.pricePerUnitPattern, s)
 		if !ok {
-			logger.WARN("%v - [%s] Failed to parse price per unit", index, link)
+			logger.DEBUG_WARN("%v - [%s] Failed to parse price per unit", index, link)
 			return
 		}
 
-		discountPricePerUnit := (discountPrice / price) * pricePerUnit
+		var discountPricePerUnit float64
+		if parser.sellerName == "Dunnes" && discountPrice != 0.0{
+			discountPricePerUnit = pricePerUnit
+			pricePerUnit  = (price / discountPrice) * pricePerUnit
+			
+		} else {
+			discountPricePerUnit = (discountPrice / price) * pricePerUnit
+		}
 
 		discountPriceInWords, ok := parseDiscountPriceInWords(index, logger, s, parser.discountPricePattern, parser.discountPriceInWordsRegexPattern, parser.discountPriceInWordsStringsToStrip...)
 		if !ok {
@@ -208,7 +217,7 @@ func (parser *HTMLParser) Parse(logger *logger.Logger, doc *goquery.Document) (p
 		*products = append(*products, p)
 	})
 
-	logger.INFO("%s - Successfully parsed '%v' out of '%v' products", parser.sellerName, len(*products), index+1)
+	logger.DEBUG("%s - Successfully parsed '%v' out of '%v' products", parser.sellerName, len(*products), index+1)
 
 	return products, true
 }

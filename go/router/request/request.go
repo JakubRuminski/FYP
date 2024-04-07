@@ -72,11 +72,10 @@ func HandleApiRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger) (ok bool) {
-	logger.DEBUG("Request: %s", r.URL.Path)
 
-	logger.INFO("Request: %s", r.UserAgent())
-	logger.INFO("Request: %s", r.RemoteAddr)
-
+	logger.INFO("INFO: %s - %s", r.RemoteAddr, r.URL.Path)
+	
+	logger.INFO("DEBUG: %s", r.UserAgent())
 	clientID, ok := token.GetID(logger, r)
 	if !ok {
 		clientID = uuid.New().String()

@@ -2,6 +2,7 @@ package query
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/jakubruminski/FYP/go/api/query/query_clients"
@@ -27,32 +28,43 @@ func INITIALISE_DATABASE(logger *logger.Logger) (ok bool) {
     return true
 }
 
-func Products(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, searchTerm string) (found, ok bool) {
+func Products(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, searchTerm string) (found, expired, ok bool) {
 
-    ProductIDs, ok := query_searchs.Get(logger, tx, searchTerm)
+    ProductIDs, ok := query_searchs.GetIDs(logger, tx, searchTerm)
     if !ok {
         logger.ERROR("Failed to get product IDs")
-        return false, false
+        return false, false, false
     }
-
     if len(*ProductIDs) == 0 {
-        logger.ERROR("No products found")
-        return false, true
+        logger.DEBUG_WARN("No products found")
+        return false, false, true
     }
 
     ok = query_products.Get(logger, tx, products, ProductIDs)
     if !ok {
         logger.ERROR("Failed to get products")
-        return false, false
+        return false, false, false
     }
 
-	return true, true
+    expiry, ok := query_searchs.GetExpiry(logger, tx, searchTerm)
+    if !ok {
+        logger.ERROR("Failed to get expiry")
+        return false, false, false
+    }
+
+    nowTime := int(time.Now().Unix())
+    if nowTime > expiry {
+        logger.DEBUG_WARN("Expiry time has passed")
+        return false, true, true
+    }
+
+	return true, false, true
 
 }
 
-func AddProducts(logger *logger.Logger, tx *sql.Tx, query string, productsToAdd *[]*product.Product) (ok bool) {
+func AddProducts(logger *logger.Logger, tx *sql.Tx, query string, oldProducts, productsToAdd *[]*product.Product) (ok bool) {
 
-    if !query_products.Add(logger, tx, productsToAdd) {
+    if !query_products.Add(logger, tx, oldProducts, productsToAdd) {
         logger.ERROR("Failed to add products")
         return false
     }
@@ -62,22 +74,30 @@ func AddProducts(logger *logger.Logger, tx *sql.Tx, query string, productsToAdd 
 
 func AddSearchTerm(logger *logger.Logger, tx *sql.Tx, searchTerm string, products *[]*product.Product) (ok bool) {
     
-        if !query_searchs.Add(logger, tx, searchTerm, products) {
-            logger.ERROR("Failed to add search term")
-            return false
-        }
-    
-        return true
+    if !query_searchs.Add(logger, tx, searchTerm, products) {
+        logger.ERROR("Failed to add search term")
+        return false
     }
 
-func AddToBaskets(logger *logger.Logger, clientID string, product product.Product) (ok bool) {
-
-	return false
-
+    return true
 }
 
-func Baskets(logger *logger.Logger, clientID string) (products *[]*product.Product, ok bool) {
+func AddToBaskets(logger *logger.Logger, tx *sql.Tx, clientID string, product product.Product) (ok bool) {
 
-	return nil, false
+    if !query_clients.Add(logger, tx, clientID, product.ID) {
+        logger.ERROR("Failed to add product to basket")
+        return false
+    }
 
+    return true
+}
+
+func Baskets(logger *logger.Logger, tx *sql.Tx, clientID string, products *[]*product.Product) (ok bool) {
+
+	if !query_clients.GetByID(logger, tx, clientID, products) {
+        logger.ERROR("Failed to get products from basket")
+        return false
+    }
+
+    return true
 }

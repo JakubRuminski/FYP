@@ -15,7 +15,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 	URL     := "https://www.dunnesstoresgrocery.com"
 	fullURL := URL + "/sm/delivery/rsid/258/results?q="
 	fullURL += searchValue
-	fullURL += "&page=1&count=90"
+	fullURL += "&take=90"
 
 	waitForJavaScript := false
 
@@ -51,7 +51,7 @@ func Fetch(logger *logger.Logger, searchValue string) (products *[]*product.Prod
 
 	products, ok = urlContext.Get(logger)
 	if !ok {
-		logger.ERROR("Failed to get results from Tesco")
+		logger.ERROR("Failed to get results from Dunnes")
 		return nil, false
 	}
 

@@ -3,7 +3,6 @@ package query_products
 import (
 	"context"
 	"database/sql"
-	"strconv"
 
 	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/lib/pq"
@@ -27,7 +26,7 @@ func INIT(logger *logger.Logger) (ok bool) {
 	return true
 }
 
-func Get(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, productIDs *[]*string) (ok bool) {
+func Get(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, productIDs *[]*int64) (ok bool) {
 
     query := `SELECT id, seller, name, currency, price, price_per_unit, discount_price, discount_price_per_unit, discount_price_in_words, unit_type, url, img_url FROM products WHERE id = ANY($1)`
     ok = postgres.ExecuteContextLookUpQuery(logger, tx, get, query, productIDs, products)
@@ -41,23 +40,13 @@ func Get(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, produc
 
 func get(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, args ...interface{}) (ok bool) {
 
-    productIDs, ok := args[0].(*[]*string)
+    productIDs, ok := args[0].(*[]*int64)
     if !ok {
         logger.ERROR("Failed to get product IDs")
         return false
     }
 
-    var productIDsSlice []int64
-    for _, productID := range *productIDs {
-        id, err := strconv.ParseInt(*productID, 10, 64)
-        if err != nil {
-            logger.ERROR("Failed to parse product ID: %s", err)
-            return false
-        }
-        productIDsSlice = append(productIDsSlice, id)
-    }
-
-    rows, err := tx.QueryContext(ctx, query, pq.Array(productIDsSlice))
+    rows, err := tx.QueryContext(ctx, query, pq.Array(*productIDs))
     if err != nil {
         logger.ERROR("Failed to get products: %s", err)
         return false
@@ -66,6 +55,7 @@ func get(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, a
 
     products, ok := args[1].(*[]*product.Product)
 
+    i := 0
     for rows.Next() {
         product := &product.Product{}
         err := rows.Scan(
@@ -87,13 +77,28 @@ func get(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, a
             return false
         }
         *products = append(*products, product)
+        
+        logger.DEBUG("%d: Product: --------------------------", i)
+        logger.DEBUG("%d: p.ID: %d", i, product.ID)
+        logger.DEBUG("%d: p.Seller: %s", i, product.Seller)
+        logger.DEBUG("%d: p.Name: %s", i, product.Name)
+        logger.DEBUG("%d: p.Currency: %s", i, product.Currency)
+        logger.DEBUG("%d: p.Price: %f", i, product.Price)
+        logger.DEBUG("%d: p.PricePerUnit: %f", i, product.PricePerUnit)
+        logger.DEBUG("%d: p.DiscountPrice: %f", i, product.DiscountPrice)
+        logger.DEBUG("%d: p.DiscountPricePerUnit: %f", i, product.DiscountPricePerUnit)
+        logger.DEBUG("%d: p.DiscountPriceInWords: %s", i, product.DiscountPriceInWords)
+        logger.DEBUG("%d: p.UnitType: %s", i, product.UnitType)
+        logger.DEBUG("%d: p.URL: %s", i, product.URL)
+        logger.DEBUG("%d: p.ImgURL: %s", i, product.ImgURL)
+        i++
     }
 
     return true
 }
 
 
-func Add(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product) bool {
+func Add(logger *logger.Logger, tx *sql.Tx, oldProducts, products *[]*product.Product) bool {
 
 	// Check if there are products to insert
 	if len(*products) == 0 {
@@ -103,7 +108,7 @@ func Add(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product) bool {
 
     query := product.ProductInsertQuery()
 
-	ok := postgres.ExecuteContextChangeQuery(logger, tx, add, query, products)
+	ok := postgres.ExecuteContextChangeQuery(logger, tx, add, query, oldProducts, products)
 	if !ok {
 		logger.ERROR("Failed to add products")
 		return false
@@ -115,9 +120,16 @@ func Add(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product) bool {
 
 func add(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, args ...interface{}) (ok bool) {
 
-    products, ok := args[0].(*[]*product.Product)
+    products, ok := args[1].(*[]*product.Product)
     if !ok {
         logger.ERROR("Failed to get products")
+        return false
+    }
+
+    // Accesses oldProducts
+    _, ok = args[0].(*[]*product.Product)
+    if !ok {
+        logger.ERROR("Failed to get oldProducts")
         return false
     }
 
@@ -129,6 +141,20 @@ func add(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, a
 
     rowsAffected := int64(0)
     for _, product := range *products {
+
+        // TODO: Possibly check oldProducts if match and just return it's ID.
+
+        id, exists, ok := productUrlAlreadyExists(logger, tx, product.URL)
+        if !ok {
+            logger.ERROR("Failed to check if the product URL exists")
+            return false
+        }
+        if exists {
+            product.ID = id
+            logger.DEBUG("Product URL already exists at ID: %d", product.ID)
+            continue
+        }
+
         result, err := tx.ExecContext(
             ctx,
             query,
@@ -181,6 +207,56 @@ func add(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, a
 }
 
 
+func productUrlAlreadyExists(logger *logger.Logger, tx *sql.Tx, url string) (id int64, exists, ok bool) {
+
+    query := `SELECT id FROM products WHERE url = $1`
+    ok = postgres.ExecuteContextLookUpQuery(logger, tx, existsQuery, query, url, &id, &exists)
+    if !ok {
+        logger.ERROR("Failed to check if the product URL exists")
+        return -1, false, false
+    }
+
+    return id, exists, true
+}
+
+func existsQuery(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, args ...interface{}) (ok bool) {
+        
+    url, ok := args[0].(string)
+    if !ok {
+        logger.ERROR("Failed to get the URL")
+        return false
+    }
+
+    id, ok := args[1].(*int64)
+    if !ok {
+        logger.ERROR("Failed to get the ID")
+        return false
+    }
+
+    exists, ok := args[2].(*bool)
+    if !ok {
+        logger.ERROR("Failed to get the exists")
+        return false
+    }
+
+    err := tx.QueryRowContext(ctx, query, url).Scan(id)
+    if err == sql.ErrNoRows {
+        logger.DEBUG("Product URL doesn't exist")
+        *exists = false
+        return true
+    }
+
+    if err != nil {
+        logger.ERROR("Failed to check if the product URL exists. Reason: %s", err)
+        return false
+    }
+
+    logger.DEBUG("Product URL exists at ID: %d", *id)
+    *exists = true
+    return true
+}
+
+
 func getNextAvailableID(logger *logger.Logger, tx *sql.Tx) (id int64, ok bool) {
 
     query := `SELECT nextval('products_id_seq')`
@@ -195,19 +271,19 @@ func getNextAvailableID(logger *logger.Logger, tx *sql.Tx) (id int64, ok bool) {
 
 func getID(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, args ...interface{}) (ok bool) {
     
-        var id int64
-        err := tx.QueryRowContext(ctx, query).Scan(&id)
-        if err != nil {
-            logger.ERROR("Failed to get the next available ID. Reason: %s", err)
-            return false
-        }
-    
-        idPtr, ok := args[0].(*int64)
-        if !ok {
-            logger.ERROR("Failed to get the next available ID")
-            return false
-        }
-        *idPtr = id
-    
-        return true
+    var id int64
+    err := tx.QueryRowContext(ctx, query).Scan(&id)
+    if err != nil {
+        logger.ERROR("Failed to get the next available ID. Reason: %s", err)
+        return false
     }
+
+    idPtr, ok := args[0].(*int64)
+    if !ok {
+        logger.ERROR("Failed to get the next available ID")
+        return false
+    }
+    *idPtr = id
+
+    return true
+}

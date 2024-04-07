@@ -2,6 +2,7 @@ package product
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"sort"
 
@@ -46,7 +47,7 @@ func ProductCreateQuery() (query string) {
 
 func ProductInsertQuery() (query string) {
 	query = `
-    INSERT INTO products 
+    INSERT INTO products
     (seller, name, currency, price, price_per_unit, discount_price, discount_price_per_unit, discount_price_in_words, unit_type, url, img_url)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	RETURNING id
@@ -76,15 +77,41 @@ func NewProduct(logger                     *logger.Logger,
 
 
 func ParseProduct(logger *logger.Logger, r *http.Request) (product *Product, ok bool) {
-	decoder := json.NewDecoder(r.Body)
-	defer r.Body.Close()
+	var result struct {
+        Result *Product `json:"result"`
+    }
 
-	if err := decoder.Decode(&product); err != nil {
-		logger.ERROR("Failed to decode product. Reason: %s", err)
-		return nil, false
-	}
+    body, err := io.ReadAll(r.Body)
+    if err != nil {
+        logger.ERROR("Failed to read request body. Reason: %s", err)
+        return nil, false
+    }
 
-	return product, true
+    if err := json.Unmarshal(body, &result); err != nil {
+        logger.ERROR("Failed to decode product. Reason: %s", err)
+        return nil, false
+    }
+
+    if result.Result == nil {
+        logger.ERROR("Missing 'result' field in JSON.")
+        return nil, false
+    }
+
+    product = result.Result
+
+    logger.DEBUG("p.ID: %d", product.ID)
+    logger.DEBUG("p.Name: %s", product.Name)
+    logger.DEBUG("p.Seller: %s", product.Seller)
+    logger.DEBUG("p.Price: %f", product.Price)
+    logger.DEBUG("p.PricePerUnit: %f", product.PricePerUnit)
+    logger.DEBUG("p.DiscountPrice: %f", product.DiscountPrice)
+    logger.DEBUG("p.DiscountPricePerUnit: %f", product.DiscountPricePerUnit)
+    logger.DEBUG("p.DiscountPriceInWords: %s", product.DiscountPriceInWords)
+    logger.DEBUG("p.UnitType: %s", product.UnitType)
+    logger.DEBUG("p.URL: %s", product.URL)
+    logger.DEBUG("p.ImgURL: %s", product.ImgURL)
+
+    return product, true
 }
 
 
@@ -114,8 +141,6 @@ func Sort(logger *logger.Logger, products *[]*Product) (ok bool) {
 		return true
 	}
 
-	// Use sort.SliceStable to sort the slice if you want to preserve the original order among equal elements.
-	// Otherwise, you can use sort.Slice for potentially faster sorting without this guarantee.
 	sort.SliceStable((*products), func(i, j int) bool {
 		Product_i_PricePerUnit := (*products)[i].PricePerUnit
 		Product_i_DiscountPricePerUnit := (*products)[i].DiscountPricePerUnit
@@ -142,6 +167,14 @@ func Sort(logger *logger.Logger, products *[]*Product) (ok bool) {
 		
 		return Product_i_PricePerUnit < Product_j_PricePerUnit
 	})
+
+	for i, product := range *products {
+		if product.DiscountPricePerUnit != 0.0 {
+			logger.DEBUG("Product %d: %f", i, product.DiscountPricePerUnit)
+		} else {
+			logger.DEBUG("Product PricePerUnit: %f", product.PricePerUnit)
+		}
+	}
 
 	return true
 }
