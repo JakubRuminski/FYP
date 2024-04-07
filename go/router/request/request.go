@@ -41,9 +41,17 @@ func handleRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger
 
 	environment, ok := env.Get(logger, "ENVIRONMENT")
 	if !ok { return false }
-	logger.SetEnvironment(environment)
 
-	file := logger.InitRequestLogFile(clientID)
+	verbose, ok := env.GetBool(logger, "VERBOSE")
+	if !ok { return false }
+
+	logger.SetFlags(environment, verbose, clientID)
+
+	file, ok := logger.InitRequestLogFile(clientID)
+	if !ok {
+		logger.ERROR("Error while creating log file")
+		return false
+	}
 	defer file.Close()
 
 	fs := http.FileServer(http.Dir(pathToStaticBuild))
@@ -58,14 +66,16 @@ func handleRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger
 func HandleApiRequest(w http.ResponseWriter, r *http.Request) {
 	logger := &logger.Logger{}
 	ok := handleApiRequest(w, r, logger)
-
 	if !ok {
 		response.WriteResponse(logger, w, http.StatusInternalServerError, "application/json", "error", "Something went wrong, please try again.")
 	}
 }
 
 func handleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Logger) (ok bool) {
-	logger.INFO("Request: %s", r.URL.Path)
+	logger.DEBUG("Request: %s", r.URL.Path)
+
+	logger.INFO("Request: %s", r.UserAgent())
+	logger.INFO("Request: %s", r.RemoteAddr)
 
 	clientID, ok := token.GetID(logger, r)
 	if !ok {
@@ -79,18 +89,28 @@ func handleApiRequest(w http.ResponseWriter, r *http.Request, logger *logger.Log
 
 	environment, ok := env.Get(logger, "ENVIRONMENT")
 	if !ok { return false }
-	logger.SetEnvironment(environment)
 
-	logger.INFO("Client ID: %s", clientID)
+	verbose, ok := env.GetBool(logger, "VERBOSE")
+	if !ok { return false }
 
-	file := logger.InitRequestLogFile(clientID)
+	logger.SetFlags(environment, verbose, clientID)
+
+	logger.DEBUG("Client ID: %s", clientID)
+
+	file, ok := logger.InitRequestLogFile(clientID)
+	if !ok {
+		logger.ERROR("Error while creating log file")
+		return false
+	}
 	defer file.Close()
 
 	_, ok = api.GetResponse(logger, r, w)
 	if !ok {
-		logger.ERROR("Error while getting products")
+		logger.ERROR("Error while getting products: %s", file.Name())
 		return false
 	}
+
+	logger.DEBUG("Request handled. Client log file: %s", file.Name())
 
 	return true
 }
