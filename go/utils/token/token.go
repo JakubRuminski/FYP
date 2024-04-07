@@ -17,7 +17,7 @@ func ValidToken(logger *logger.Logger, r *http.Request) (token *Token, ok bool) 
 	// Read the token from the Auth-Token cookie
 	cookie, err := r.Cookie("Auth-Token")
 	if err != nil {
-		logger.ERROR("Failed to get cookie. Reason: %s", err)
+		logger.DEBUG_WARN("Failed to get cookie. Reason: %s", err)
 		return nil, false
 	}
 
@@ -138,7 +138,7 @@ type Token struct {
 func GetID(logger *logger.Logger, r *http.Request) (string, bool) {
 	token, valid := ValidToken(logger, r)
 	if !valid {
-		logger.ERROR("Invalid or expired token")
+		logger.DEBUG_WARN("Invalid or expired token")
 		return "", false
 	}
 	if token.ClientID == "" {
