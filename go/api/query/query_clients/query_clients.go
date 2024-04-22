@@ -97,6 +97,47 @@ func add(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, a
 	return true
 }
 
+func Remove(logger *logger.Logger, tx *sql.Tx, clientID string, productID int64) (ok bool) {
+	
+	query := `
+		DELETE FROM clients
+		WHERE client_id = $1 AND product_id = $2
+	`
+
+	ok = postgres.ExecuteContextChangeQuery(logger, tx, remove, query, clientID, productID)
+	if !ok {
+		logger.ERROR("Failed to remove client")
+		return false
+	}
+
+	return true
+}
+
+
+func remove(logger *logger.Logger, tx *sql.Tx, ctx context.Context, query string, args ...interface{}) (ok bool) {
+
+	clientID, ok := args[0].(string)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return false
+	}
+
+	productID, ok := args[1].(int64)
+	if !ok {
+		logger.ERROR("Failed to get product ID")
+		return false
+	}
+
+	_, err := tx.ExecContext(ctx, query, clientID, productID)
+	if err != nil {
+		logger.ERROR("Failed to remove client: %s", err)
+		return false
+	}
+
+	return true
+}
+
+
 func GetByID(logger *logger.Logger, tx *sql.Tx, clientID string, products *[]*product.Product) (ok bool) {
 	
 	query := `

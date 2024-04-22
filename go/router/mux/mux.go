@@ -47,14 +47,17 @@ func INIT(logger *logger.Logger) (port string, mux *http.ServeMux, ok bool) {
 
 	MAX_REQUESTS, ok = env.GetInt( logger, "MAX_REQUESTS" )
     if !ok { return "", nil, false }
-	
 	logger.SetFlags(environment, verbose, "root-logger")
 
 	mux.HandleFunc("/", RequestLimiter( logger, request.HandleRequest ))
+	mux.HandleFunc("/basket", RequestLimiter( logger, request.HandleRequest ))
 	mux.HandleFunc("/static/", RequestLimiter( logger, request.HandleRequest ))
 
 	mux.HandleFunc("/api/search", RequestLimiter( logger, request.HandleApiRequest ))
+
 	mux.HandleFunc("/api/add_item", RequestLimiter( logger, request.HandleApiRequest ))
+	mux.HandleFunc("/api/remove_item", RequestLimiter( logger, request.HandleApiRequest ))
+
 	mux.HandleFunc("/api/get_items", RequestLimiter( logger, request.HandleApiRequest ))
 
 	return port, mux, true

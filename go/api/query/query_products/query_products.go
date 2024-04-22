@@ -266,6 +266,8 @@ func getNextAvailableID(logger *logger.Logger, tx *sql.Tx) (id int64, ok bool) {
         return -1, false
     }
 
+    logger.DEBUG("Next available ID: %d", id)
+
     return id, true
 }
 

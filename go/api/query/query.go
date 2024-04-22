@@ -8,6 +8,7 @@ import (
 	"github.com/jakubruminski/FYP/go/api/query/query_clients"
 	"github.com/jakubruminski/FYP/go/api/query/query_products"
 	"github.com/jakubruminski/FYP/go/api/query/query_searchs"
+	"github.com/jakubruminski/FYP/go/utils/env"
 	"github.com/jakubruminski/FYP/go/utils/logger"
 )
 
@@ -45,6 +46,11 @@ func Products(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, s
         logger.ERROR("Failed to get products")
         return false, false, false
     }
+    
+    expiry_offset, ok := env.GetInt(logger, "SEARCH_EXPIRY_IN_DAYS")
+    if !ok { return false, false, false }
+
+    expiry_offset_seconds := expiry_offset * 24 * 60 * 60
 
     expiry, ok := query_searchs.GetExpiry(logger, tx, searchTerm)
     if !ok {
@@ -53,7 +59,7 @@ func Products(logger *logger.Logger, tx *sql.Tx, products *[]*product.Product, s
     }
 
     nowTime := int(time.Now().Unix())
-    if nowTime > expiry {
+    if nowTime > (expiry + expiry_offset_seconds) {
         logger.DEBUG_WARN("Expiry time has passed")
         return false, true, true
     }
@@ -96,6 +102,16 @@ func Baskets(logger *logger.Logger, tx *sql.Tx, clientID string, products *[]*pr
 
 	if !query_clients.GetByID(logger, tx, clientID, products) {
         logger.ERROR("Failed to get products from basket")
+        return false
+    }
+
+    return true
+}
+
+func RemoveFromBasket(logger *logger.Logger, tx *sql.Tx, clientID string, product product.Product) (ok bool) {
+    
+    if !query_clients.Remove(logger, tx, clientID, product.ID) {
+        logger.ERROR("Failed to remove product from basket")
         return false
     }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/jakubruminski/FYP/go/api/product"
 	"github.com/jakubruminski/FYP/go/api/query"
 
+	"github.com/jakubruminski/FYP/go/utils/env"
 	"github.com/jakubruminski/FYP/go/utils/http/response"
 	"github.com/jakubruminski/FYP/go/utils/logger"
 	"github.com/jakubruminski/FYP/go/utils/postgres"
@@ -37,6 +38,9 @@ func GetResponse(logger *logger.Logger, r *http.Request, w http.ResponseWriter) 
 
 	} else if r.URL.Path == "/api/get_items" {
 		return getItemsHandler(logger, w, r)
+
+	} else if r.URL.Path == "/api/remove_item" {
+		return removeItemHandler(logger, w, r)
 	}
 
 	logger.ERROR("Invalid request %s", r.URL.Path)
@@ -65,15 +69,16 @@ func getProductsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Re
 		return nil, false
 	}
 
-
 	numberOfProductsForTesco := 0
 	numberOfProductsForDunnes := 0
 	numberOfProductsForSuperValu := 0
 	for _, product := range *products {	
 		if product.Seller == "Tesco" {
 			numberOfProductsForTesco++
+			
 		} else if product.Seller == "Dunnes" {
 			numberOfProductsForDunnes++
+
 		} else if product.Seller == "SuperValu" {
 			numberOfProductsForSuperValu++
 		}
@@ -117,13 +122,21 @@ func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...inte
         return false
     }
 
-	found, expired, ok := query.Products(logger, tx, products, searchTerm)
-	if !ok {
-		logger.ERROR("Failed to get products from database")
-	}
-	if !expired && found {
-		logger.DEBUG("Products found in database")
-		return true
+	db_available, ok := env.GetBool(logger, "DB_AVAILABLE")
+	if !ok { return false }
+
+	found := false
+	expired := false
+	if db_available {
+		found, expired, ok := query.Products(logger, tx, products, searchTerm)
+
+		if !ok {
+			logger.ERROR("Failed to get products from database")
+		}
+		if !expired && found {
+			logger.INFO("Products found in database")
+			return true
+		}
 	}
 
 	var oldProducts []*product.Product
@@ -137,8 +150,8 @@ func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...inte
 		logger.DEBUG_WARN("Products expired in database")
 	}
 
-	logger.INFO("products variable address: %p", products)
-	logger.INFO("oldProducts variable address: %p", oldProducts)
+	logger.DEBUG("products variable address: %p", products)
+	logger.DEBUG("oldProducts variable address: %p", oldProducts)
 
 	if !found {
 		logger.DEBUG_WARN("No products matched in database, now web scraping...")
@@ -153,17 +166,18 @@ func getProducts_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...inte
 		logger.ERROR("No products found")
 		return true
 	}
+    if db_available {
+		ok = query.AddProducts(logger, tx, searchTerm, &oldProducts, products)
+		if !ok {
+			logger.ERROR("Failed to add products to database")
+			return false
+		}
 
-	ok = query.AddProducts(logger, tx, searchTerm, &oldProducts, products)
-	if !ok {
-		logger.ERROR("Failed to add products to database")
-		return false
-	}
-
-	ok = query.AddSearchTerm(logger, tx, searchTerm, products)
-	if !ok {
-		logger.ERROR("Failed to add search term to database")
-		return false
+		ok = query.AddSearchTerm(logger, tx, searchTerm, products)
+		if !ok {
+			logger.ERROR("Failed to add search term to database")
+			return false
+		}
 	}
 
 	return true
@@ -210,6 +224,14 @@ func parseSearchValue(searchValue string) string {
 
 
 func addItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
+	db_available, ok := env.GetBool(logger, "DB_AVAILABLE")
+	if !ok { return nil, false }
+
+	if !db_available {
+		message := "Sorry, could not add this product"
+		response.WriteResponse(logger, w, http.StatusOK, "application/json", "message", message)
+	}
+
 	logger.INFO("Request: %s", r.URL.Path)
 
 	clientID, ok := token.GetID(logger, r)
@@ -264,6 +286,15 @@ func AddItem_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interfac
 func getItemsHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
 	logger.INFO("Request: %s", r.URL.Path)
 
+	db_available, ok := env.GetBool(logger, "DB_AVAILABLE")
+	if !ok { return nil, false }
+
+	if !db_available {
+		message := "Sorry, cannot display products at this time."
+		response.WriteResponse(logger, w, http.StatusOK, "application/json", "message", message)
+		return nil, true
+	}
+
 	clientID, ok := token.GetID(logger, r)
 	if !ok {
 		logger.ERROR("Failed to get client ID")
@@ -312,3 +343,60 @@ func getItems_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interfa
 	return query.Baskets(logger, tx, clientID, products)
 }
 
+func removeItemHandler(logger *logger.Logger, w http.ResponseWriter, r *http.Request) (jsonResponse []byte, ok bool) {
+	logger.INFO("Request: %s", r.URL.Path)
+
+	db_available, ok := env.GetBool(logger, "DB_AVAILABLE")
+	if !ok { return nil, false }
+
+	if !db_available {
+		message := "Sorry, could not remove this product"
+		response.WriteResponse(logger, w, http.StatusOK, "application/json", "message", message)
+	}
+
+	clientID, ok := token.GetID(logger, r)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return nil, false
+	}
+
+	product, ok := product.ParseProduct(logger, r)
+	if !ok {
+		logger.ERROR("Failed to parse product")
+		return nil, false
+	}
+
+	logger.DEBUG("Removing product from basket id: %d", product.ID)
+
+	ok = postgres.ExecuteInTransaction(logger, RemoveItem_DoInTransaction, clientID, product)
+	if !ok {
+		logger.ERROR("Failed to remove product from basket")
+		return nil, false
+	}
+
+	message := fmt.Sprintf("Product removed from basket: %s", product.Name)
+	response.WriteResponse(logger, w, http.StatusOK, "application/json", "message", message)
+
+	return nil, true
+}
+
+func RemoveItem_DoInTransaction(logger *logger.Logger, tx *sql.Tx, args ...interface{}) bool {
+	if len(args) != 2 {
+		logger.ERROR("Expected 2 arguments, got %d", len(args))
+		return false
+	}
+
+	clientID, ok := args[0].(string)
+	if !ok {
+		logger.ERROR("Failed to get client ID")
+		return false
+	}
+
+	product, ok := args[1].(*product.Product)
+	if !ok {
+		logger.ERROR("Failed to get product")
+		return false
+	}
+
+	return query.RemoveFromBasket(logger, tx, clientID, *product)
+}

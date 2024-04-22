@@ -102,12 +102,20 @@ func ExecuteInTransaction(
 	transactionFunction func(logger *logger.Logger, tx *sql.Tx, args ...interface{}) bool,
 	transactionArgs ...interface{},
 ) bool {
-	tx, ok := createTransaction(logger)
-	if !ok {
-		logger.ERROR("Couldn't start the transaction.")
-		return false
+
+	var ok bool
+	db_available, ok := env.GetBool(logger, "DB_AVAILABLE")
+	if !ok { return false }
+	
+	var tx *sql.Tx
+	if db_available {
+		tx, ok = createTransaction(logger)
+		if !ok {
+			logger.ERROR("Couldn't start the transaction.")
+			return false
+		}
+		defer tx.Rollback()
 	}
-	defer tx.Rollback()
 
 	ok = transactionFunction(logger, tx, transactionArgs...)
 	if !ok {
@@ -115,10 +123,12 @@ func ExecuteInTransaction(
 		return false
 	}
 
-	err := tx.Commit()
-	if err != nil {
-		logger.ERROR("Couldn't commit the transaction. Reason: %s", err)
-		return false
+	if db_available {
+		err := tx.Commit()
+		if err != nil {
+			logger.ERROR("Couldn't commit the transaction. Reason: %s", err)
+			return false
+		}
 	}
 
 	return true
